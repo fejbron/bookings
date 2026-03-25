@@ -1,48 +1,55 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 
 interface AuthContextType {
+  user: User | null
   isAdmin: boolean
-  login: (pin: string) => boolean
-  logout: () => void
-  changePin: (currentPin: string, newPin: string) => boolean
+  loading: boolean
+  login: (email: string, password: string) => Promise<string | null>
+  logout: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const PIN_STORAGE_KEY = 'bookslot-admin-pin'
-const SESSION_KEY = 'bookslot-admin-session'
-const DEFAULT_PIN = 'admin123'
-
-function getStoredPin(): string {
-  return localStorage.getItem(PIN_STORAGE_KEY) || DEFAULT_PIN
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true')
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const login = useCallback((pin: string): boolean => {
-    if (pin === getStoredPin()) {
-      setIsAdmin(true)
-      sessionStorage.setItem(SESSION_KEY, 'true')
-      return true
-    }
-    return false
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const logout = useCallback(() => {
-    setIsAdmin(false)
-    sessionStorage.removeItem(SESSION_KEY)
+  const login = useCallback(async (email: string, password: string): Promise<string | null> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return error ? error.message : null
   }, [])
 
-  const changePin = useCallback((currentPin: string, newPin: string): boolean => {
-    if (currentPin !== getStoredPin()) return false
-    if (!newPin.trim() || newPin.length < 4) return false
-    localStorage.setItem(PIN_STORAGE_KEY, newPin)
-    return true
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
   }, [])
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<string | null> => {
+    // Re-authenticate first to verify current password
+    if (!user?.email) return 'Not authenticated'
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+    if (signInError) return 'Current password is incorrect.'
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    return error ? error.message : null
+  }, [user])
 
   return (
-    <AuthContext.Provider value={{ isAdmin, login, logout, changePin }}>
+    <AuthContext.Provider value={{ user, isAdmin: !!user, loading, login, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   )

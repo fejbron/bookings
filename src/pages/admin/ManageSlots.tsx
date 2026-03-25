@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info } from 'lucide-react'
+import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 
@@ -13,6 +13,7 @@ export default function ManageSlots() {
   const [endTime, setEndTime] = useState('17:00')
   const [duration, setDuration] = useState(15)
   const [excludeWeekends, setExcludeWeekends] = useState(true)
+  const [lecturerName, setLecturerName] = useState('')
   const [generated, setGenerated] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -46,7 +47,7 @@ export default function ManageSlots() {
 
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const result = generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends })
+    const result = generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends, lecturerName: lecturerName.trim() || undefined })
     setGenerated(result.length)
     setTimeout(() => setGenerated(null), 4000)
   }
@@ -89,7 +90,7 @@ export default function ManageSlots() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4 mb-5">
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Slot Duration</label>
               <select value={duration} onChange={e => setDuration(Number(e.target.value))} className={fieldCls}>
@@ -106,6 +107,20 @@ export default function ManageSlots() {
                 />
                 <span className="text-sm font-medium text-[var(--text-primary)]">Exclude weekends</span>
               </label>
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Lecturer Name <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={lecturerName}
+                onChange={e => setLecturerName(e.target.value)}
+                placeholder="e.g. Dr. Mensah"
+                className={`${fieldCls} pl-8`}
+              />
             </div>
           </div>
 
@@ -195,6 +210,11 @@ export default function ManageSlots() {
                           <Clock className="w-3 h-3 opacity-50" />
                           <span className="font-medium">{formatTime(slot.time)}</span>
                           <span className="opacity-60">{slot.duration}m</span>
+                          {slot.lecturerName && (
+                            <span className="flex items-center gap-1 opacity-70">
+                              <User className="w-3 h-3" />{slot.lecturerName}
+                            </span>
+                          )}
                           {isBooked ? (
                             <span className="text-[10px] bg-orange-100 text-[var(--accent)] px-1.5 py-0.5 rounded font-medium">Booked</span>
                           ) : (

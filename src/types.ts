@@ -3,6 +3,7 @@ export interface PresentationSlot {
   date: string
   time: string
   duration: number
+  lecturerName?: string
 }
 
 export interface SlotConfig {
@@ -13,6 +14,7 @@ export interface SlotConfig {
   endTime: string
   duration: number
   excludeWeekends: boolean
+  lecturerName?: string
   createdAt: string
 }
 

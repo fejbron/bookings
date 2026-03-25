@@ -94,7 +94,7 @@ export default function Sidebar() {
       <div className="px-3 mt-auto pt-4 border-t border-[var(--border)]">
         {isAdmin ? (
           <button
-            onClick={() => { logout(); setMobileOpen(false) }}
+            onClick={() => { void logout(); setMobileOpen(false) }}
             className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-100 hover:text-red-600 transition-colors w-full"
           >
             <LogOut className="w-[18px] h-[18px]" />

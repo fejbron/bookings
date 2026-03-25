@@ -103,6 +103,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             date: dateStr,
             time,
             duration: config.duration,
+            lecturerName: config.lecturerName,
           })
         }
 

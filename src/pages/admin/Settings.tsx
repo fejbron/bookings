@@ -4,28 +4,31 @@ import { useAuth } from '../../context/AuthContext'
 import { useBookings } from '../../context/BookingContext'
 
 export default function Settings() {
-  const { changePin } = useAuth()
+  const { changePassword } = useAuth()
   const { adminSettings, updateAdminSettings } = useBookings()
 
-  const [currentPin, setCurrentPin] = useState('')
-  const [newPin, setNewPin] = useState('')
-  const [confirmPin, setConfirmPin] = useState('')
-  const [pinMsg, setPinMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [pwSubmitting, setPwSubmitting] = useState(false)
   const [welcomeMsg, setWelcomeMsg] = useState(adminSettings.welcomeMessage)
   const [savedWelcome, setSavedWelcome] = useState(false)
 
-  function handlePinChange(e: React.FormEvent) {
+  async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault()
-    setPinMsg(null)
-    if (newPin !== confirmPin) return setPinMsg({ type: 'error', text: 'New PINs do not match.' })
-    if (newPin.length < 4) return setPinMsg({ type: 'error', text: 'PIN must be at least 4 characters.' })
-    const ok = changePin(currentPin, newPin)
-    if (ok) {
-      setPinMsg({ type: 'success', text: 'PIN changed successfully!' })
-      setCurrentPin(''); setNewPin(''); setConfirmPin('')
+    setPwMsg(null)
+    if (newPassword !== confirmPassword) return setPwMsg({ type: 'error', text: 'New passwords do not match.' })
+    if (newPassword.length < 6) return setPwMsg({ type: 'error', text: 'Password must be at least 6 characters.' })
+    setPwSubmitting(true)
+    const err = await changePassword(currentPassword, newPassword)
+    if (err) {
+      setPwMsg({ type: 'error', text: err })
     } else {
-      setPinMsg({ type: 'error', text: 'Current PIN is incorrect.' })
+      setPwMsg({ type: 'success', text: 'Password changed successfully!' })
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
     }
+    setPwSubmitting(false)
   }
 
   function handleSaveWelcome() {
@@ -49,37 +52,37 @@ export default function Settings() {
         </div>
 
         <div className="space-y-5">
-          {/* Change PIN */}
-          <form onSubmit={handlePinChange} className="bg-white rounded-xl border border-[var(--border)] p-5 sm:p-6 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
+          {/* Change Password */}
+          <form onSubmit={handlePasswordChange} className="bg-white rounded-xl border border-[var(--border)] p-5 sm:p-6 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
             <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <Key className="w-4 h-4 text-[var(--accent)]" /> Change Admin PIN
+              <Key className="w-4 h-4 text-[var(--accent)]" /> Change Password
             </h2>
             <div className="space-y-3 max-w-sm">
               <div>
-                <label className={labelCls}>Current PIN</label>
-                <input type="password" value={currentPin} onChange={e => setCurrentPin(e.target.value)} placeholder="Enter current PIN" className={inputCls} />
+                <label className={labelCls}>Current Password</label>
+                <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>New PIN</label>
-                <input type="password" value={newPin} onChange={e => setNewPin(e.target.value)} placeholder="At least 4 characters" className={inputCls} />
+                <label className={labelCls}>New Password</label>
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 6 characters" className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Confirm New PIN</label>
-                <input type="password" value={confirmPin} onChange={e => setConfirmPin(e.target.value)} placeholder="Re-enter new PIN" className={inputCls} />
+                <label className={labelCls}>Confirm New Password</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" className={inputCls} />
               </div>
             </div>
-            {pinMsg && (
-              <div className={`mt-4 flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${pinMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                {pinMsg.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                {pinMsg.text}
+            {pwMsg && (
+              <div className={`mt-4 flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${pwMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                {pwMsg.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                {pwMsg.text}
               </div>
             )}
             <button
               type="submit"
-              disabled={!currentPin || !newPin || !confirmPin}
+              disabled={!currentPassword || !newPassword || !confirmPassword || pwSubmitting}
               className="mt-4 flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Update PIN
+              {pwSubmitting ? 'Updating…' : 'Update Password'}
             </button>
           </form>
 
