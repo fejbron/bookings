@@ -157,6 +157,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) throw new Error('Slot not found')
 
+    const { data: slotTaken } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('slot_id', slotId)
+      .eq('status', 'confirmed')
+      .maybeSingle()
+    if (slotTaken) throw new Error('This slot was just taken. Please choose another time.')
+
     const { data: existing } = await supabase
       .from('bookings')
       .select('id')
