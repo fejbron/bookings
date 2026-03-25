@@ -98,14 +98,14 @@ export default function Home() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       {lecturers.length > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                          <User className="w-3 h-3 text-[var(--text-muted)]" />
+                        <span className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                          <User className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                           {lecturers.join(', ')}
                         </span>
                       )}
                       {groups.length > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                          <Users className="w-3 h-3 text-[var(--text-muted)]" />
+                        <span className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                          <Users className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                           {groups.join(', ')}
                         </span>
                       )}
