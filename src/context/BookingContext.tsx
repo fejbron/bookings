@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { eachDayOfInterval, parseISO, format } from 'date-fns'
 import type { PresentationSlot, SlotConfig, Booking } from '../types'
+import { supabase } from '../lib/supabase'
 
 export interface AdminSettings {
   welcomeMessage: string
@@ -17,118 +18,124 @@ interface BookingContextType {
   bookings: Booking[]
   slotConfigs: SlotConfig[]
   adminSettings: AdminSettings
+  loading: boolean
 
-  generateSlots: (config: Omit<SlotConfig, 'id' | 'createdAt'>) => PresentationSlot[]
-  removeSlot: (id: string) => void
-  clearAllSlots: () => void
+  generateSlots: (config: Omit<SlotConfig, 'id' | 'createdAt'>) => Promise<PresentationSlot[]>
+  removeSlot: (id: string) => Promise<void>
+  clearAllSlots: () => Promise<void>
 
   getAvailableDates: () => string[]
   getAvailableSlots: (date: string) => PresentationSlot[]
-  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }) => Booking
+  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }) => Promise<Booking>
   getStudentBookings: (email: string) => Booking[]
-  cancelBooking: (id: string) => void
+  cancelBooking: (id: string) => Promise<void>
 
   getBookingsForDateRange: (start: string, end: string) => Booking[]
   exportBookingsCSV: () => void
-  updateAdminSettings: (settings: Partial<AdminSettings>) => void
+  updateAdminSettings: (settings: Partial<AdminSettings>) => Promise<void>
 }
 
 const BookingContext = createContext<BookingContextType | null>(null)
 
-const SLOTS_KEY = 'bookslot-slots'
-const BOOKINGS_KEY = 'bookslot-bookings'
-const CONFIGS_KEY = 'bookslot-configs'
-const SETTINGS_KEY = 'bookslot-admin-settings'
-
-function load<T>(key: string): T[] {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toSlot(r: any): PresentationSlot {
+  return { id: r.id, date: r.date, time: r.time, duration: r.duration, lecturerName: r.lecturer_name ?? undefined, classGroup: r.class_group ?? undefined }
 }
 
-function loadSettings(): AdminSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS
-  } catch {
-    return DEFAULT_SETTINGS
-  }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toBooking(r: any): Booking {
+  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, createdAt: r.created_at }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toConfig(r: any): SlotConfig {
+  return { id: r.id, startDate: r.start_date, endDate: r.end_date, startTime: r.start_time, endTime: r.end_time, duration: r.duration, excludeWeekends: r.exclude_weekends, lecturerName: r.lecturer_name ?? undefined, classGroup: r.class_group ?? undefined, createdAt: r.created_at }
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [slots, setSlots] = useState<PresentationSlot[]>(() => load(SLOTS_KEY))
-  const [bookings, setBookings] = useState<Booking[]>(() => load(BOOKINGS_KEY))
-  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>(() => load(CONFIGS_KEY))
-  const [adminSettings, setAdminSettings] = useState<AdminSettings>(() => loadSettings())
+  const [slots, setSlots] = useState<PresentationSlot[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([])
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_SETTINGS)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { localStorage.setItem(SLOTS_KEY, JSON.stringify(slots)) }, [slots])
-  useEffect(() => { localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings)) }, [bookings])
-  useEffect(() => { localStorage.setItem(CONFIGS_KEY, JSON.stringify(slotConfigs)) }, [slotConfigs])
-  useEffect(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify(adminSettings)) }, [adminSettings])
+  useEffect(() => {
+    async function load() {
+      const [slotsRes, bookingsRes, configsRes, settingsRes] = await Promise.all([
+        supabase.from('slots').select('*').order('date').order('time'),
+        supabase.from('bookings').select('*').order('created_at', { ascending: false }),
+        supabase.from('slot_configs').select('*').order('created_at', { ascending: false }),
+        supabase.from('admin_settings').select('*').eq('id', 1).single(),
+      ])
+      if (slotsRes.data) setSlots(slotsRes.data.map(toSlot))
+      if (bookingsRes.data) setBookings(bookingsRes.data.map(toBooking))
+      if (configsRes.data) setSlotConfigs(configsRes.data.map(toConfig))
+      if (settingsRes.data) setAdminSettings({ welcomeMessage: settingsRes.data.welcome_message, allowSelfCancel: settingsRes.data.allow_self_cancel })
+      setLoading(false)
+    }
+    load()
+  }, [])
 
-  const bookedSlotIds = new Set(
-    bookings.filter(b => b.status === 'confirmed').map(b => b.slotId)
-  )
+  const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed').map(b => b.slotId))
 
-  const generateSlots = useCallback((config: Omit<SlotConfig, 'id' | 'createdAt'>): PresentationSlot[] => {
-    const days = eachDayOfInterval({
-      start: parseISO(config.startDate),
-      end: parseISO(config.endDate),
-    })
-
-    const newSlots: PresentationSlot[] = []
+  const generateSlots = useCallback(async (config: Omit<SlotConfig, 'id' | 'createdAt'>): Promise<PresentationSlot[]> => {
+    const days = eachDayOfInterval({ start: parseISO(config.startDate), end: parseISO(config.endDate) })
     const [startH, startM] = config.startTime.split(':').map(Number)
     const [endH, endM] = config.endTime.split(':').map(Number)
     const startMinutes = startH * 60 + startM
     const endMinutes = endH * 60 + endM
 
+    const rows: { id: string; date: string; time: string; duration: number; lecturer_name: string | null; class_group: string | null }[] = []
+
     for (const day of days) {
       if (config.excludeWeekends && (day.getDay() === 0 || day.getDay() === 6)) continue
-
       const dateStr = format(day, 'yyyy-MM-dd')
       let current = startMinutes
-
       while (current + config.duration <= endMinutes) {
         const h = Math.floor(current / 60)
         const m = current % 60
         const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-
-        const exists = slots.some(s => s.date === dateStr && s.time === time)
-        if (!exists) {
-          newSlots.push({
-            id: crypto.randomUUID(),
-            date: dateStr,
-            time,
-            duration: config.duration,
-            lecturerName: config.lecturerName,
-            classGroup: config.classGroup,
-          })
+        if (!slots.some(s => s.date === dateStr && s.time === time)) {
+          rows.push({ id: crypto.randomUUID(), date: dateStr, time, duration: config.duration, lecturer_name: config.lecturerName ?? null, class_group: config.classGroup ?? null })
         }
-
         current += config.duration
       }
     }
 
-    const savedConfig: SlotConfig = {
-      ...config,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    }
+    if (rows.length === 0) return []
 
-    setSlots(prev => [...prev, ...newSlots])
-    setSlotConfigs(prev => [savedConfig, ...prev])
-    return newSlots
+    const { data: slotData, error: slotErr } = await supabase.from('slots').insert(rows).select()
+    if (slotErr) throw slotErr
+
+    const { data: configData } = await supabase.from('slot_configs').insert({
+      id: crypto.randomUUID(),
+      start_date: config.startDate,
+      end_date: config.endDate,
+      start_time: config.startTime,
+      end_time: config.endTime,
+      duration: config.duration,
+      exclude_weekends: config.excludeWeekends,
+      lecturer_name: config.lecturerName ?? null,
+      class_group: config.classGroup ?? null,
+    }).select().single()
+
+    const inserted = slotData.map(toSlot)
+    setSlots(prev => [...prev, ...inserted])
+    if (configData) setSlotConfigs(prev => [toConfig(configData), ...prev])
+    return inserted
   }, [slots])
 
-  const removeSlot = useCallback((id: string) => {
+  const removeSlot = useCallback(async (id: string) => {
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('slot_id', id)
+    await supabase.from('slots').delete().eq('id', id)
     setSlots(prev => prev.filter(s => s.id !== id))
     setBookings(prev => prev.map(b => b.slotId === id ? { ...b, status: 'cancelled' as const } : b))
   }, [])
 
-  const clearAllSlots = useCallback(() => {
+  const clearAllSlots = useCallback(async () => {
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('status', 'confirmed')
+    await supabase.from('slots').delete().not('id', 'is', null)
+    await supabase.from('slot_configs').delete().not('id', 'is', null)
     setSlots([])
     setSlotConfigs([])
     setBookings(prev => prev.map(b => ({ ...b, status: 'cancelled' as const })))
@@ -137,34 +144,34 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const getAvailableDates = useCallback((): string[] => {
     const dates = new Set<string>()
     for (const slot of slots) {
-      if (!bookedSlotIds.has(slot.id)) {
-        dates.add(slot.date)
-      }
+      if (!bookedSlotIds.has(slot.id)) dates.add(slot.date)
     }
     return Array.from(dates).sort()
   }, [slots, bookedSlotIds])
 
   const getAvailableSlots = useCallback((date: string): PresentationSlot[] => {
-    return slots
-      .filter(s => s.date === date && !bookedSlotIds.has(s.id))
-      .sort((a, b) => a.time.localeCompare(b.time))
+    return slots.filter(s => s.date === date && !bookedSlotIds.has(s.id)).sort((a, b) => a.time.localeCompare(b.time))
   }, [slots, bookedSlotIds])
 
-  const bookSlot = useCallback((slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }): Booking => {
+  const bookSlot = useCallback(async (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }): Promise<Booking> => {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) throw new Error('Slot not found')
 
-    const booking: Booking = {
+    const { data: inserted, error } = await supabase.from('bookings').insert({
       id: crypto.randomUUID(),
-      slotId,
+      slot_id: slotId,
       date: slot.date,
       time: slot.time,
       duration: slot.duration,
-      ...data,
+      student_name: data.studentName,
+      student_email: data.studentEmail,
+      presentation_topic: data.presentationTopic,
+      notes: data.notes,
       status: 'confirmed',
-      createdAt: new Date().toISOString(),
-    }
+    }).select().single()
+    if (error) throw error
 
+    const booking = toBooking(inserted)
     setBookings(prev => [booking, ...prev])
     return booking
   }, [slots])
@@ -173,8 +180,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return bookings.filter(b => b.studentEmail.toLowerCase() === email.toLowerCase())
   }, [bookings])
 
-  const cancelBooking = useCallback((id: string) => {
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' } : b))
+  const cancelBooking = useCallback(async (id: string) => {
+    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id)
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b))
   }, [])
 
   const getBookingsForDateRange = useCallback((start: string, end: string): Booking[] => {
@@ -184,19 +192,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const exportBookingsCSV = useCallback(() => {
     const confirmed = bookings.filter(b => b.status === 'confirmed')
     if (confirmed.length === 0) return
-
     const headers = ['Student Name', 'Email', 'Presentation Topic', 'Date', 'Time', 'Duration (min)', 'Notes', 'Booked At']
-    const rows = confirmed.map(b => [
-      b.studentName,
-      b.studentEmail,
-      b.presentationTopic,
-      b.date,
-      b.time,
-      b.duration.toString(),
-      b.notes.replace(/,/g, ';'),
-      b.createdAt,
-    ])
-
+    const rows = confirmed.map(b => [b.studentName, b.studentEmail, b.presentationTopic, b.date, b.time, b.duration.toString(), b.notes.replace(/,/g, ';'), b.createdAt])
     const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -207,13 +204,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url)
   }, [bookings])
 
-  const updateAdminSettings = useCallback((updates: Partial<AdminSettings>) => {
-    setAdminSettings(prev => ({ ...prev, ...updates }))
-  }, [])
+  const updateAdminSettings = useCallback(async (updates: Partial<AdminSettings>) => {
+    const newSettings = { ...adminSettings, ...updates }
+    await supabase.from('admin_settings').upsert({ id: 1, welcome_message: newSettings.welcomeMessage, allow_self_cancel: newSettings.allowSelfCancel })
+    setAdminSettings(newSettings)
+  }, [adminSettings])
 
   return (
     <BookingContext.Provider value={{
-      slots, bookings, slotConfigs, adminSettings,
+      slots, bookings, slotConfigs, adminSettings, loading,
       generateSlots, removeSlot, clearAllSlots,
       getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking,
       getBookingsForDateRange, exportBookingsCSV, updateAdminSettings,

@@ -31,8 +31,8 @@ export default function Settings() {
     setPwSubmitting(false)
   }
 
-  function handleSaveWelcome() {
-    updateAdminSettings({ welcomeMessage: welcomeMsg.trim() })
+  async function handleSaveWelcome() {
+    await updateAdminSettings({ welcomeMessage: welcomeMsg.trim() })
     setSavedWelcome(true)
     setTimeout(() => setSavedWelcome(false), 3000)
   }
@@ -125,7 +125,7 @@ export default function Settings() {
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">When disabled, only admins can cancel.</p>
               </div>
               <button
-                onClick={() => updateAdminSettings({ allowSelfCancel: !adminSettings.allowSelfCancel })}
+                onClick={() => void updateAdminSettings({ allowSelfCancel: !adminSettings.allowSelfCancel })}
                 className={`transition-colors ${adminSettings.allowSelfCancel ? 'text-[var(--accent)]' : 'text-gray-300'}`}
               >
                 {adminSettings.allowSelfCancel ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}

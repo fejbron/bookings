@@ -21,6 +21,7 @@ export default function Book() {
   const [presentationTopic, setPresentationTopic] = useState('')
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const availableDates = useMemo(() => getAvailableDates(), [getAvailableDates])
@@ -50,15 +51,20 @@ export default function Book() {
     return Object.keys(newErrors).length === 0
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!slotId || !validateForm()) return
-    bookSlot(slotId, {
-      studentName: name.trim(),
-      studentEmail: email.trim(),
-      presentationTopic: presentationTopic.trim(),
-      notes: notes.trim(),
-    })
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      await bookSlot(slotId, {
+        studentName: name.trim(),
+        studentEmail: email.trim(),
+        presentationTopic: presentationTopic.trim(),
+        notes: notes.trim(),
+      })
+      setSubmitted(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (submitted) {
@@ -234,10 +240,10 @@ export default function Book() {
           ) : (
             <button
               onClick={handleConfirm}
-              disabled={!canNext}
+              disabled={!canNext || submitting}
               className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4" /> Confirm Booking
+              <Check className="w-4 h-4" /> {submitting ? 'Confirming…' : 'Confirm Booking'}
             </button>
           )}
         </div>

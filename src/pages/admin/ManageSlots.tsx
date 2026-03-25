@@ -46,9 +46,9 @@ export default function ManageSlots() {
 
   const dates = Object.keys(groupedSlots).sort()
 
-  function handleGenerate(e: React.FormEvent) {
+  async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const result = generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends, lecturerName: lecturerName.trim() || undefined, classGroup: classGroup.trim() || undefined })
+    const result = await generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends, lecturerName: lecturerName.trim() || undefined, classGroup: classGroup.trim() || undefined })
     setGenerated(result.length)
     setTimeout(() => setGenerated(null), 4000)
   }

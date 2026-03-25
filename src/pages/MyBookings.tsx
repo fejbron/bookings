@@ -24,8 +24,8 @@ export default function MyBookings() {
     setSubmittedEmail(email.trim())
   }
 
-  function handleCancel(id: string) {
-    cancelBooking(id)
+  async function handleCancel(id: string) {
+    await cancelBooking(id)
     setCancelConfirmId(null)
   }
 
