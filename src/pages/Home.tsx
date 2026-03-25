@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CalendarCheck, Clock, ArrowRight, Presentation, MessageSquare, CalendarDays } from 'lucide-react'
+import { CalendarCheck, Clock, ArrowRight, Presentation, MessageSquare, CalendarDays, User, Users } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
 import { format, parseISO } from 'date-fns'
 
@@ -10,10 +10,17 @@ const steps = [
 ]
 
 export default function Home() {
-  const { slots, bookings, getAvailableDates, adminSettings } = useBookings()
+  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings } = useBookings()
   const confirmedCount = bookings.filter(b => b.status === 'confirmed').length
   const availableCount = slots.length - confirmedCount
   const upcomingDates = getAvailableDates().slice(0, 5)
+
+  const dateInfo = upcomingDates.map(date => {
+    const available = getAvailableSlots(date)
+    const lecturers = [...new Set(available.map(s => s.lecturerName).filter(Boolean))] as string[]
+    const groups = [...new Set(available.map(s => s.classGroup).filter(Boolean))] as string[]
+    return { date, count: available.length, lecturers, groups }
+  })
 
   return (
     <div className="min-h-screen">
@@ -76,15 +83,36 @@ export default function Home() {
               <CalendarDays className="w-4 h-4 text-[var(--accent)]" />
               Next Available Dates
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {upcomingDates.map(date => (
+            <div className="space-y-2">
+              {dateInfo.map(({ date, count, lecturers, groups }) => (
                 <Link
                   key={date}
                   to="/book"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition-colors border border-[var(--border)]"
+                  className="flex items-center gap-4 px-4 py-3 rounded-lg bg-gray-50 hover:bg-[var(--accent-light)] hover:border-orange-200 transition-colors border border-[var(--border)] group"
                 >
-                  <CalendarDays className="w-3.5 h-3.5" />
-                  {format(parseISO(date), 'EEE, MMM d')}
+                  <div className="shrink-0 text-center w-10">
+                    <div className="text-[10px] font-bold uppercase text-[var(--accent)]">{format(parseISO(date), 'EEE')}</div>
+                    <div className="text-xl font-bold text-[var(--text-primary)] leading-tight">{format(parseISO(date), 'd')}</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{format(parseISO(date), 'MMM')}</div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {lecturers.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+                          <User className="w-3 h-3 text-[var(--text-muted)]" />
+                          {lecturers.join(', ')}
+                        </span>
+                      )}
+                      {groups.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+                          <Users className="w-3 h-3 text-[var(--text-muted)]" />
+                          {groups.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)] mt-0.5">{count} slot{count !== 1 ? 's' : ''} available</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--accent)] shrink-0 transition-colors" />
                 </Link>
               ))}
             </div>
