@@ -121,6 +121,7 @@ export default function ManageSlots() {
                   value={lecturerName}
                   onChange={e => setLecturerName(e.target.value)}
                   placeholder="e.g. Dr. Mensah"
+                  maxLength={100}
                   className={`${fieldCls} pl-8`}
                 />
               </div>
@@ -134,6 +135,7 @@ export default function ManageSlots() {
                   value={classGroup}
                   onChange={e => setClassGroup(e.target.value)}
                   placeholder="e.g. CS Year 3"
+                  maxLength={100}
                   className={`${fieldCls} pl-8`}
                 />
               </div>

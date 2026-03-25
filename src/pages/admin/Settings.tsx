@@ -96,6 +96,7 @@ export default function Settings() {
               value={welcomeMsg}
               onChange={e => setWelcomeMsg(e.target.value)}
               rows={3}
+              maxLength={300}
               placeholder="e.g. Book your final year presentation slots for Spring 2026!"
               className={`${inputCls} resize-none`}
             />

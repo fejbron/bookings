@@ -185,9 +185,9 @@ export default function Book() {
 
             <div className="bg-white rounded-xl border border-[var(--border)] p-5 space-y-4">
               {[
-                { icon: User, label: 'Full Name', key: 'name', type: 'text', val: name, setter: setName, placeholder: 'John Doe', err: errors.name },
-                { icon: Mail, label: 'Email', key: 'email', type: 'email', val: email, setter: setEmail, placeholder: 'student@example.com', err: errors.email },
-                { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: presentationTopic, setter: setPresentationTopic, placeholder: 'e.g. Final Year Project Demo', err: errors.topic },
+                { icon: User, label: 'Full Name', key: 'name', type: 'text', val: name, setter: setName, placeholder: 'John Doe', err: errors.name, maxLength: 100 },
+                { icon: Mail, label: 'Email', key: 'email', type: 'email', val: email, setter: setEmail, placeholder: 'student@example.com', err: errors.email, maxLength: 254 },
+                { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: presentationTopic, setter: setPresentationTopic, placeholder: 'e.g. Final Year Project Demo', err: errors.topic, maxLength: 200 },
               ].map(field => (
                 <div key={field.key}>
                   <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5 flex items-center gap-1.5">
@@ -198,6 +198,7 @@ export default function Book() {
                     value={field.val}
                     onChange={e => { field.setter(e.target.value); setErrors(prev => ({ ...prev, [field.key]: '' })) }}
                     placeholder={field.placeholder}
+                    maxLength={field.maxLength}
                     className={`w-full px-3.5 py-2.5 rounded-lg border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition ${field.err ? 'border-red-300' : 'border-[var(--border)]'}`}
                   />
                   {field.err && <p className="mt-1 text-xs text-red-500">{field.err}</p>}
@@ -211,6 +212,7 @@ export default function Book() {
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   rows={3}
+                  maxLength={500}
                   placeholder="Anything we should know?"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition resize-none"
                 />
