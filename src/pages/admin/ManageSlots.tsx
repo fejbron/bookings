@@ -95,7 +95,7 @@ export default function ManageSlots() {
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Slot Duration</label>
               <select value={duration} onChange={e => setDuration(Number(e.target.value))} className={fieldCls}>
-                {[10, 15, 20, 30, 45, 60].map(v => <option key={v} value={v}>{v} minutes</option>)}
+                {[5, 10, 15, 20, 30, 45, 60].map(v => <option key={v} value={v}>{v} minutes</option>)}
               </select>
             </div>
             <div className="flex items-end">
