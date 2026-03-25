@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User } from 'lucide-react'
+import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 
@@ -14,6 +14,7 @@ export default function ManageSlots() {
   const [duration, setDuration] = useState(15)
   const [excludeWeekends, setExcludeWeekends] = useState(true)
   const [lecturerName, setLecturerName] = useState('')
+  const [classGroup, setClassGroup] = useState('')
   const [generated, setGenerated] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -47,7 +48,7 @@ export default function ManageSlots() {
 
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const result = generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends, lecturerName: lecturerName.trim() || undefined })
+    const result = generateSlots({ startDate, endDate, startTime, endTime, duration, excludeWeekends, lecturerName: lecturerName.trim() || undefined, classGroup: classGroup.trim() || undefined })
     setGenerated(result.length)
     setTimeout(() => setGenerated(null), 4000)
   }
@@ -110,17 +111,32 @@ export default function ManageSlots() {
             </div>
           </div>
 
-          <div className="mb-5">
-            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Lecturer Name <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={lecturerName}
-                onChange={e => setLecturerName(e.target.value)}
-                placeholder="e.g. Dr. Mensah"
-                className={`${fieldCls} pl-8`}
-              />
+          <div className="grid sm:grid-cols-2 gap-4 mb-5">
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Lecturer Name <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  value={lecturerName}
+                  onChange={e => setLecturerName(e.target.value)}
+                  placeholder="e.g. Dr. Mensah"
+                  className={`${fieldCls} pl-8`}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Class Group <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
+              <div className="relative">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  value={classGroup}
+                  onChange={e => setClassGroup(e.target.value)}
+                  placeholder="e.g. CS Year 3"
+                  className={`${fieldCls} pl-8`}
+                />
+              </div>
             </div>
           </div>
 
@@ -213,6 +229,11 @@ export default function ManageSlots() {
                           {slot.lecturerName && (
                             <span className="flex items-center gap-1 opacity-70">
                               <User className="w-3 h-3" />{slot.lecturerName}
+                            </span>
+                          )}
+                          {slot.classGroup && (
+                            <span className="flex items-center gap-1 opacity-70">
+                              <Users className="w-3 h-3" />{slot.classGroup}
                             </span>
                           )}
                           {isBooked ? (

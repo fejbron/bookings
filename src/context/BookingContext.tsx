@@ -104,6 +104,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             time,
             duration: config.duration,
             lecturerName: config.lecturerName,
+            classGroup: config.classGroup,
           })
         }
 
