@@ -157,6 +157,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) throw new Error('Slot not found')
 
+    const { data: existing } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('student_email', data.studentEmail.toLowerCase())
+      .eq('date', slot.date)
+      .eq('status', 'confirmed')
+      .maybeSingle()
+    if (existing) throw new Error('You already have a booking on this date.')
+
     const { data: inserted, error } = await supabase.from('bookings').insert({
       id: crypto.randomUUID(),
       slot_id: slotId,
@@ -164,7 +173,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       time: slot.time,
       duration: slot.duration,
       student_name: data.studentName,
-      student_email: data.studentEmail,
+      student_email: data.studentEmail.toLowerCase(),
       presentation_topic: data.presentationTopic,
       notes: data.notes,
       status: 'confirmed',

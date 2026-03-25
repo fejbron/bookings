@@ -22,6 +22,7 @@ export default function Book() {
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [bookingError, setBookingError] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const availableDates = useMemo(() => getAvailableDates(), [getAvailableDates])
@@ -54,6 +55,7 @@ export default function Book() {
   async function handleConfirm() {
     if (!slotId || !validateForm()) return
     setSubmitting(true)
+    setBookingError('')
     try {
       await bookSlot(slotId, {
         studentName: name.trim(),
@@ -62,6 +64,8 @@ export default function Book() {
         notes: notes.trim(),
       })
       setSubmitted(true)
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -218,6 +222,14 @@ export default function Book() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Booking error */}
+        {bookingError && (
+          <div className="mt-6 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg border border-red-100">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {bookingError}
           </div>
         )}
 
