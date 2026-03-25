@@ -1,0 +1,123 @@
+import { Link } from 'react-router-dom'
+import { CalendarCheck, Clock, ArrowRight, Presentation, MessageSquare, CalendarDays } from 'lucide-react'
+import { useBookings } from '../context/BookingContext'
+import { format, parseISO } from 'date-fns'
+
+const steps = [
+  { icon: CalendarCheck, title: 'Pick a Date', desc: 'Browse the calendar for available presentation dates.' },
+  { icon: Clock, title: 'Choose a Time', desc: 'Select from the time slots your instructor has made available.' },
+  { icon: Presentation, title: 'Confirm Booking', desc: 'Enter your details and secure your presentation slot.' },
+]
+
+export default function Home() {
+  const { slots, bookings, getAvailableDates, adminSettings } = useBookings()
+  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length
+  const availableCount = slots.length - confirmedCount
+  const upcomingDates = getAvailableDates().slice(0, 5)
+
+  return (
+    <div className="min-h-screen">
+      {/* Hero */}
+      <section className="bg-white border-b border-[var(--border)]">
+        <div className="max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-20">
+          <div className="animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 text-[var(--accent)] text-sm font-medium mb-4">
+              <Presentation className="w-4 h-4" />
+              Student Presentation Booking
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tracking-tight">
+              Book Your<br />
+              <span className="text-[var(--accent)]">Presentation Slot</span>
+            </h1>
+            <p className="mt-4 text-base text-[var(--text-secondary)] max-w-lg">
+              Reserve your presentation time in seconds. Pick an available date, choose your slot, and confirm.
+            </p>
+
+            {availableCount > 0 && (
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                <span className="font-semibold text-[var(--text-primary)]">{availableCount}</span> slot{availableCount !== 1 ? 's' : ''} currently available
+              </p>
+            )}
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                to="/book"
+                className="inline-flex items-center gap-2 bg-[var(--accent)] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors"
+              >
+                Book a Slot
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/my-bookings"
+                className="inline-flex items-center gap-2 text-[var(--text-secondary)] border border-[var(--border)] px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Find My Bookings
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Admin Welcome Message */}
+      {adminSettings.welcomeMessage && (
+        <section className="max-w-4xl mx-auto px-6 sm:px-8 pt-6 animate-fade-in-up">
+          <div className="bg-[var(--accent-light)] rounded-xl p-4 flex items-start gap-3 border border-orange-100">
+            <MessageSquare className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-primary)] font-medium">{adminSettings.welcomeMessage}</p>
+          </div>
+        </section>
+      )}
+
+      {/* Upcoming Available Dates */}
+      {upcomingDates.length > 0 && (
+        <section className="max-w-4xl mx-auto px-6 sm:px-8 pt-6 animate-fade-in-up" style={{ animationDelay: '60ms' }}>
+          <div className="bg-white rounded-xl border border-[var(--border)] p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-[var(--accent)]" />
+              Next Available Dates
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {upcomingDates.map(date => (
+                <Link
+                  key={date}
+                  to="/book"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition-colors border border-[var(--border)]"
+                >
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  {format(parseISO(date), 'EEE, MMM d')}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* How It Works */}
+      <section className="max-w-4xl mx-auto px-6 sm:px-8 py-16">
+        <div className="mb-10 animate-fade-in-up">
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">How It Works</h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">Three simple steps to reserve your presentation time.</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6 stagger-children">
+          {steps.map((step, i) => (
+            <div key={i} className="bg-white rounded-xl border border-[var(--border)] p-5 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center mb-4">
+                <step.icon className="w-5 h-5" />
+              </div>
+              <div className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider mb-1.5">
+                Step {i + 1}
+              </div>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{step.title}</h3>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-[var(--border)] text-[var(--text-muted)] text-xs text-center py-6 px-4">
+        <p>&copy; {new Date().getFullYear()} BookSlot &middot; Presentation Scheduling</p>
+      </footer>
+    </div>
+  )
+}
