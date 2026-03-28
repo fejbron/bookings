@@ -142,9 +142,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const getAvailableDates = useCallback((): string[] => {
+    const today = new Date().toISOString().slice(0, 10)
     const dates = new Set<string>()
     for (const slot of slots) {
-      if (!bookedSlotIds.has(slot.id)) dates.add(slot.date)
+      if (!bookedSlotIds.has(slot.id) && slot.date >= today) dates.add(slot.date)
     }
     return Array.from(dates).sort()
   }, [slots, bookedSlotIds])
