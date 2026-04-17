@@ -30,6 +30,9 @@ interface BookingContextType {
   getStudentBookings: (email: string) => Booking[]
   cancelBooking: (id: string) => Promise<void>
 
+  rescheduleBooking: (bookingId: string, newSlotId: string) => Promise<void>
+  addAdminComment: (bookingId: string, comment: string) => Promise<void>
+
   getBookingsForDateRange: (start: string, end: string) => Booking[]
   exportBookingsCSV: () => void
   updateAdminSettings: (settings: Partial<AdminSettings>) => Promise<void>
@@ -44,7 +47,7 @@ function toSlot(r: any): PresentationSlot {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, createdAt: r.created_at }
+  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', createdAt: r.created_at }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -203,6 +206,39 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b))
   }, [])
 
+  const rescheduleBooking = useCallback(async (bookingId: string, newSlotId: string) => {
+    const newSlot = slots.find(s => s.id === newSlotId)
+    if (!newSlot) throw new Error('Slot not found')
+
+    const { data: slotTaken } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('slot_id', newSlotId)
+      .eq('status', 'confirmed')
+      .maybeSingle()
+    if (slotTaken) throw new Error('This slot is already taken. Please choose another time.')
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ slot_id: newSlotId, date: newSlot.date, time: newSlot.time, duration: newSlot.duration })
+      .eq('id', bookingId)
+    if (error) throw error
+
+    setBookings(prev => prev.map(b => b.id === bookingId
+      ? { ...b, slotId: newSlotId, date: newSlot.date, time: newSlot.time, duration: newSlot.duration }
+      : b
+    ))
+  }, [slots])
+
+  const addAdminComment = useCallback(async (bookingId: string, comment: string) => {
+    const { error } = await supabase
+      .from('bookings')
+      .update({ admin_comment: comment })
+      .eq('id', bookingId)
+    if (error) throw error
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, adminComment: comment } : b))
+  }, [])
+
   const getBookingsForDateRange = useCallback((start: string, end: string): Booking[] => {
     return bookings.filter(b => b.date >= start && b.date <= end)
   }, [bookings])
@@ -210,8 +246,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const exportBookingsCSV = useCallback(() => {
     const confirmed = bookings.filter(b => b.status === 'confirmed')
     if (confirmed.length === 0) return
-    const headers = ['Student Name', 'Email', 'Presentation Topic', 'Date', 'Time', 'Duration (min)', 'Notes', 'Booked At']
-    const rows = confirmed.map(b => [b.studentName, b.studentEmail, b.presentationTopic, b.date, b.time, b.duration.toString(), b.notes.replace(/,/g, ';'), b.createdAt])
+    const headers = ['Student Name', 'Email', 'Presentation Topic', 'Date', 'Time', 'Duration (min)', 'Notes', 'Admin Comment', 'Booked At']
+    const rows = confirmed.map(b => [b.studentName, b.studentEmail, b.presentationTopic, b.date, b.time, b.duration.toString(), b.notes.replace(/,/g, ';'), (b.adminComment ?? '').replace(/,/g, ';'), b.createdAt])
     const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -233,6 +269,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       slots, bookings, slotConfigs, adminSettings, loading,
       generateSlots, removeSlot, clearAllSlots,
       getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking,
+      rescheduleBooking, addAdminComment,
       getBookingsForDateRange, exportBookingsCSV, updateAdminSettings,
     }}>
       {children}
