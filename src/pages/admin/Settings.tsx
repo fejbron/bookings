@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings as SettingsIcon, Key, MessageSquare, Check, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Settings as SettingsIcon, Key, MessageSquare, Check, AlertCircle, ToggleLeft, ToggleRight, Tag, Plus, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useBookings } from '../../context/BookingContext'
 
@@ -14,6 +14,9 @@ export default function Settings() {
   const [pwSubmitting, setPwSubmitting] = useState(false)
   const [welcomeMsg, setWelcomeMsg] = useState(adminSettings.welcomeMessage)
   const [savedWelcome, setSavedWelcome] = useState(false)
+  const [purposes, setPurposes] = useState<string[]>(adminSettings.bookingPurposes)
+  const [newPurpose, setNewPurpose] = useState('')
+  const [savedPurposes, setSavedPurposes] = useState(false)
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault()
@@ -35,6 +38,23 @@ export default function Settings() {
     await updateAdminSettings({ welcomeMessage: welcomeMsg.trim() })
     setSavedWelcome(true)
     setTimeout(() => setSavedWelcome(false), 3000)
+  }
+
+  function addPurpose() {
+    const trimmed = newPurpose.trim()
+    if (!trimmed || purposes.includes(trimmed)) return
+    setPurposes(prev => [...prev, trimmed])
+    setNewPurpose('')
+  }
+
+  function removePurpose(p: string) {
+    setPurposes(prev => prev.filter(x => x !== p))
+  }
+
+  async function handleSavePurposes() {
+    await updateAdminSettings({ bookingPurposes: purposes })
+    setSavedPurposes(true)
+    setTimeout(() => setSavedPurposes(false), 3000)
   }
 
   const inputCls = "w-full px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition"
@@ -115,8 +135,65 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Policies */}
+          {/* Booking Purposes */}
           <div className="bg-white rounded-xl border border-[var(--border)] p-5 sm:p-6 animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-[var(--accent)]" /> Booking Purposes
+            </h2>
+            <p className="text-xs text-[var(--text-muted)] mb-4">Options students can select when booking a slot.</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {purposes.map(p => (
+                <span key={p} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-sm text-[var(--text-secondary)] font-medium">
+                  {p}
+                  <button
+                    onClick={() => removePurpose(p)}
+                    className="text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                    title="Remove"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {purposes.length === 0 && (
+                <p className="text-xs text-[var(--text-muted)]">No options yet — add at least one.</p>
+              )}
+            </div>
+            <div className="flex gap-2 mb-4 max-w-sm">
+              <input
+                type="text"
+                value={newPurpose}
+                onChange={e => setNewPurpose(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPurpose() } }}
+                placeholder="e.g. Group Project"
+                maxLength={60}
+                className={inputCls}
+              />
+              <button
+                onClick={addPurpose}
+                disabled={!newPurpose.trim()}
+                className="flex items-center gap-1.5 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSavePurposes}
+                disabled={purposes.length === 0}
+                className="bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save Purposes
+              </button>
+              {savedPurposes && (
+                <span className="text-sm text-emerald-600 font-medium flex items-center gap-1">
+                  <Check className="w-4 h-4" /> Saved!
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Policies */}
+          <div className="bg-white rounded-xl border border-[var(--border)] p-5 sm:p-6 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
             <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <SettingsIcon className="w-4 h-4 text-[var(--accent)]" /> Booking Policies
             </h2>

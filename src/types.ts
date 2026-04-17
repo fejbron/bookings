@@ -31,6 +31,7 @@ export interface Booking {
   presentationTopic: string
   notes: string
   status: 'confirmed' | 'cancelled'
+  bookingPurpose: string
   adminComment: string
   createdAt: string
 }

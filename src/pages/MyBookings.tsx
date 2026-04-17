@@ -151,6 +151,9 @@ export default function MyBookings() {
                       <p className={`text-sm font-medium truncate ${isCancelled ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
                         {booking.presentationTopic}
                       </p>
+                      {booking.bookingPurpose && (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
+                      )}
                       {countdown && (
                         <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
                           <Timer className="w-3 h-3" />

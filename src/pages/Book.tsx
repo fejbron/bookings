@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, ArrowRight, CalendarDays, Check, FileText, Mail, Presentation, User, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, Check, FileText, Mail, Presentation, User, AlertCircle, Tag } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
@@ -11,7 +11,7 @@ const STEP_LABELS = ['Date', 'Time', 'Details']
 
 export default function Book() {
   const navigate = useNavigate()
-  const { getAvailableDates, getAvailableSlots, bookSlot } = useBookings()
+  const { getAvailableDates, getAvailableSlots, bookSlot, adminSettings } = useBookings()
 
   const [step, setStep] = useState(0)
   const [date, setDate] = useState<Date | null>(null)
@@ -20,6 +20,7 @@ export default function Book() {
   const [email, setEmail] = useState('')
   const [presentationTopic, setPresentationTopic] = useState('')
   const [notes, setNotes] = useState('')
+  const [bookingPurpose, setBookingPurpose] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [bookingError, setBookingError] = useState('')
@@ -38,12 +39,13 @@ export default function Book() {
   const canNext = (() => {
     if (step === 0) return !!date
     if (step === 1) return !!slotId
-    if (step === 2) return !!name.trim() && !!email.trim() && !!presentationTopic.trim()
+    if (step === 2) return !!name.trim() && !!email.trim() && !!presentationTopic.trim() && !!bookingPurpose
     return false
   })()
 
   function validateForm(): boolean {
     const newErrors: Record<string, string> = {}
+    if (!bookingPurpose) newErrors.purpose = 'Please select a purpose.'
     if (!name.trim()) newErrors.name = 'Full name is required.'
     if (!email.trim()) newErrors.email = 'Email is required.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) newErrors.email = 'Please enter a valid email.'
@@ -62,6 +64,7 @@ export default function Book() {
         studentEmail: email.trim(),
         presentationTopic: presentationTopic.trim(),
         notes: notes.trim(),
+        bookingPurpose,
       })
       setSubmitted(true)
     } catch (err) {
@@ -94,7 +97,7 @@ export default function Book() {
             <button
               onClick={() => {
                 setSubmitted(false); setStep(0); setDate(null); setSlotId(null)
-                setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setErrors({})
+                setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setBookingPurpose(''); setErrors({})
               }}
               className="w-full text-[var(--text-secondary)] py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors border border-[var(--border)]"
             >
@@ -186,6 +189,32 @@ export default function Book() {
                 <span className="font-semibold text-[var(--accent)]">{selectedSlot?.duration} min</span>
               </div>
             </div>
+
+            {/* Purpose of booking */}
+            {adminSettings.bookingPurposes.length > 0 && (
+              <div className="bg-white rounded-xl border border-[var(--border)] p-5">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[var(--text-muted)]" /> Purpose of Booking
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {adminSettings.bookingPurposes.map(purpose => (
+                    <button
+                      key={purpose}
+                      type="button"
+                      onClick={() => { setBookingPurpose(purpose); setErrors(prev => ({ ...prev, purpose: '' })) }}
+                      className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        bookingPurpose === purpose
+                          ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                      }`}
+                    >
+                      {purpose}
+                    </button>
+                  ))}
+                </div>
+                {errors.purpose && <p className="mt-2 text-xs text-red-500">{errors.purpose}</p>}
+              </div>
+            )}
 
             <div className="bg-white rounded-xl border border-[var(--border)] p-5 space-y-4">
               {[

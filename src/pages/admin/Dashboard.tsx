@@ -263,6 +263,9 @@ export default function Dashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
                           <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
+                          {booking.bookingPurpose && (
+                            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
+                          )}
                         </div>
 
                         {/* Actions */}
