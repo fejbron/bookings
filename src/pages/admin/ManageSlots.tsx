@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users } from 'lucide-react'
+import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users, ChevronDown } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 
@@ -35,6 +35,15 @@ export default function ManageSlots() {
   }, [canGenerate, startDate, endDate, startTime, endTime, duration, excludeWeekends])
 
   const [showPast, setShowPast] = useState(false)
+  const [expandedPastDates, setExpandedPastDates] = useState<Set<string>>(new Set())
+
+  function togglePastDate(date: string) {
+    setExpandedPastDates(prev => {
+      const next = new Set(prev)
+      next.has(date) ? next.delete(date) : next.add(date)
+      return next
+    })
+  }
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -231,24 +240,31 @@ export default function ManageSlots() {
 
             {visibleDates.map((date, di) => {
               const isPast = date < today
+              const isExpanded = !isPast || expandedPastDates.has(date)
               const ds = groupedSlots[date]
               const bookedInDay = ds.filter(s => bookedSlotIds.has(s.id)).length
               const pct = Math.round((bookedInDay / ds.length) * 100)
               return (
                 <div key={date} className={`rounded-xl border overflow-hidden animate-fade-in-up ${isPast ? 'bg-gray-50 border-[var(--border)] opacity-60' : 'bg-white border-[var(--border)]'}`} style={{ animationDelay: `${Math.min(di * 40, 240)}ms` }}>
-                  <div className="px-4 py-3 flex items-center gap-2 border-b border-[var(--border)]">
+                  <div
+                    className={`px-4 py-3 flex items-center gap-2 ${isExpanded ? 'border-b border-[var(--border)]' : ''} ${isPast ? 'cursor-pointer hover:bg-gray-100 transition-colors select-none' : ''}`}
+                    onClick={isPast ? () => togglePastDate(date) : undefined}
+                  >
                     <Calendar className="w-4 h-4 text-[var(--accent)]" />
                     <span className="text-sm font-semibold text-[var(--text-primary)]">{format(parseISO(date), 'EEEE, MMMM d, yyyy')}</span>
                     <span className="ml-auto text-xs text-[var(--text-muted)]">
                       {bookedInDay > 0 ? `${bookedInDay}/${ds.length} booked` : `${ds.length} slots`}
                     </span>
+                    {isPast && (
+                      <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                    )}
                   </div>
-                  {bookedInDay > 0 && (
+                  {isExpanded && bookedInDay > 0 && (
                     <div className="h-0.5 bg-gray-100">
                       <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
                     </div>
                   )}
-                  <div className="p-3 flex flex-wrap gap-2">
+                  {isExpanded && <div className="p-3 flex flex-wrap gap-2">
                     {ds.map(slot => {
                       const isBooked = bookedSlotIds.has(slot.id)
                       return (
@@ -276,7 +292,7 @@ export default function ManageSlots() {
                         </div>
                       )
                     })}
-                  </div>
+                  </div>}
                 </div>
               )
             })}
