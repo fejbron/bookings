@@ -97,10 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!adminSession) throw new Error('Not authenticated')
 
     const { data, error } = await supabase.auth.signUp({ email, password })
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     const lecturerId = data.user?.id
-    if (!lecturerId) throw new Error('Failed to create user account.')
+    if (!lecturerId) throw new Error('Failed to create user account. Check that email confirmation is disabled in your Supabase project (Auth → Settings → Email confirmation).')
 
     // Restore admin session in case signUp changed it
     await supabase.auth.setSession({
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: email.toLowerCase().trim(),
       class_group: classGroup.trim() || null,
     })
-    if (profileError) throw profileError
+    if (profileError) throw new Error(profileError.message)
 
     setLecturers(prev => [{
       id: lecturerId,
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteLecturerAccount = useCallback(async (id: string) => {
     const { error } = await supabase.from('lecturer_profiles').delete().eq('id', id)
-    if (error) throw error
+    if (error) throw new Error(error.message)
     setLecturers(prev => prev.filter(l => l.id !== id))
   }, [])
 
