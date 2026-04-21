@@ -86,8 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null
     }
 
-    // If the lecturer_profiles query errored (e.g. RLS), don't fall through to admin
-    if (lecturerErr) return 'Invalid email or password.'
+    // lecturerRow is null — either not a lecturer or query failed (RLS)
+    // Either way, fall through to admin (Supabase Auth)
+    if (lecturerErr) console.warn('lecturer_profiles query error:', lecturerErr.message)
 
     // Fall through to admin (Supabase Auth) — clear any stale lecturer session first
     localStorage.removeItem(LECTURER_SESSION_KEY)
