@@ -17,8 +17,11 @@ export default function Lecturers() {
   const [submitError, setSubmitError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState('')
 
-  useEffect(() => { loadLecturers() }, [loadLecturers])
+  useEffect(() => {
+    loadLecturers().catch(err => setLoadError(err instanceof Error ? err.message : 'Failed to load lecturers.'))
+  }, [loadLecturers])
 
   function validate(): boolean {
     const errs: Record<string, string> = {}
@@ -80,6 +83,20 @@ export default function Lecturers() {
             )}
           </div>
         </div>
+
+        {loadError && (
+          <div className="mb-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 px-4 py-3 rounded-lg border border-red-100 animate-fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Could not load lecturers</p>
+              <p className="mt-0.5 text-xs text-red-600">{loadError}</p>
+              <p className="mt-1 text-xs text-red-600">
+                Run this in your Supabase SQL editor:{' '}
+                <code className="font-mono bg-red-100 px-1 rounded">ALTER TABLE lecturer_profiles DISABLE ROW LEVEL SECURITY;</code>
+              </p>
+            </div>
+          </div>
+        )}
 
         {successMsg && (
           <div className="mb-4 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-lg border border-emerald-100 animate-fade-in">

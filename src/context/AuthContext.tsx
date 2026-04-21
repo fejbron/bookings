@@ -84,11 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const loadLecturers = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('lecturer_profiles')
       .select('*')
       .order('created_at', { ascending: false })
-    if (data) setLecturers(data.map(toLecturer))
+    if (error) throw new Error(error.message)
+    setLecturers((data ?? []).map(toLecturer))
   }, [])
 
   const createLecturerAccount = useCallback(async (name: string, email: string, password: string, classGroup: string) => {
