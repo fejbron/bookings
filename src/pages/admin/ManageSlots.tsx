@@ -1,11 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
 import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users, ChevronDown } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
+import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
 
 export default function ManageSlots() {
   const { slots, bookings, slotConfigs, generateSlots, removeSlot, clearAllSlots } = useBookings()
+  const { lecturers, loadLecturers } = useAuth()
+
+  useEffect(() => { loadLecturers() }, [loadLecturers])
 
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -129,18 +133,35 @@ export default function ManageSlots() {
 
           <div className="grid sm:grid-cols-2 gap-4 mb-5">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Lecturer Name <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Lecturer <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-                <input
-                  type="text"
-                  value={lecturerName}
-                  onChange={e => setLecturerName(e.target.value)}
-                  placeholder="e.g. Dr. Mensah"
-                  maxLength={100}
-                  className={`${fieldCls} pl-8`}
-                />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                {lecturers.length > 0 ? (
+                  <select
+                    value={lecturerName}
+                    onChange={e => setLecturerName(e.target.value)}
+                    className={`${fieldCls} pl-8 pr-8 appearance-none`}
+                  >
+                    <option value="">— No lecturer assigned —</option>
+                    {lecturers.map(l => (
+                      <option key={l.id} value={l.name}>{l.name}{l.classGroup ? ` (${l.classGroup})` : ''}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={lecturerName}
+                    onChange={e => setLecturerName(e.target.value)}
+                    placeholder="No lecturers yet — add them in the Lecturers page"
+                    disabled
+                    className={`${fieldCls} pl-8 opacity-50 cursor-not-allowed`}
+                  />
+                )}
               </div>
+              {lecturers.length === 0 && (
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Add lecturer accounts first from the <span className="font-medium">Lecturers</span> page.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Class Group <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
