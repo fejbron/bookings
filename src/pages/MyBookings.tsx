@@ -16,7 +16,7 @@ export default function MyBookings() {
     () => (submittedEmail ? getStudentBookings(submittedEmail) : []),
     [submittedEmail, getStudentBookings],
   )
-  const activeBookings = bookings.filter(b => b.status === 'confirmed')
+  const activeBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending')
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled')
 
   function handleLookup(e: React.FormEvent) {
@@ -154,7 +154,10 @@ export default function MyBookings() {
                       {booking.bookingPurpose && (
                         <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
                       )}
-                      {countdown && (
+                      {booking.status === 'pending' && (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-xs text-amber-700 font-medium">Awaiting confirmation</span>
+                      )}
+                      {countdown && booking.status !== 'pending' && (
                         <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
                           <Timer className="w-3 h-3" />
                           {countdown}

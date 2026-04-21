@@ -5,10 +5,10 @@ import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 import type { Booking } from '../../types'
 
-type TabFilter = 'upcoming' | 'confirmed' | 'cancelled'
+type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function Dashboard() {
-  const { bookings, slots, cancelBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+  const { bookings, slots, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [dateFrom, setDateFrom] = useState('')
@@ -42,17 +42,19 @@ export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const confirmedBookings = bookings.filter(b => b.status === 'confirmed')
+  const pendingBookings = bookings.filter(b => b.status === 'pending')
   const totalSlots = slots.length
   const bookedCount = confirmedBookings.length
-  const availableCount = totalSlots - bookedCount
+  const availableCount = totalSlots - bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length
 
   const filtered = useMemo(() => {
     let list = bookings
     switch (filter) {
       case 'upcoming': {
-        list = list.filter((b) => b.status === 'confirmed' && b.date >= today)
+        list = list.filter((b) => (b.status === 'confirmed' || b.status === 'pending') && b.date >= today)
         break
       }
+      case 'pending':
       case 'confirmed':
       case 'cancelled':
         list = list.filter((b) => b.status === filter)
@@ -171,7 +173,8 @@ export default function Dashboard() {
 
   const tabs: { key: TabFilter; label: string }[] = [
     { key: 'upcoming', label: 'Upcoming' },
-    { key: 'confirmed', label: 'All Confirmed' },
+    { key: 'pending', label: `Pending${pendingBookings.length > 0 ? ` (${pendingBookings.length})` : ''}` },
+    { key: 'confirmed', label: 'Confirmed' },
     { key: 'cancelled', label: 'Cancelled' },
   ]
 
@@ -350,9 +353,26 @@ export default function Dashboard() {
                             <MessageSquare className="w-4 h-4" />
                           </button>
 
-                          {booking.status === 'confirmed' ? (
+                          {booking.status === 'pending' && (
                             <>
-                              {/* Reschedule button (only future bookings) */}
+                              <button
+                                onClick={() => confirmBooking(booking.id)}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
+                                title="Confirm booking"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" /> Confirm
+                              </button>
+                              <button
+                                onClick={() => cancelBooking(booking.id)}
+                                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="Cancel booking"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {booking.status === 'confirmed' && (
+                            <>
                               {booking.date >= today && (
                                 <button
                                   onClick={() => openReschedule(booking)}
@@ -362,7 +382,6 @@ export default function Dashboard() {
                                   <CalendarDays className="w-4 h-4" />
                                 </button>
                               )}
-                              {/* Cancel button */}
                               <button
                                 onClick={() => cancelBooking(booking.id)}
                                 className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -371,7 +390,8 @@ export default function Dashboard() {
                                 <X className="w-4 h-4" />
                               </button>
                             </>
-                          ) : (
+                          )}
+                          {booking.status === 'cancelled' && (
                             <span className="text-xs font-medium text-red-400 bg-red-50 px-2.5 py-1 rounded-md ml-1">
                               Cancelled
                             </span>

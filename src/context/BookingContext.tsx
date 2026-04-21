@@ -28,7 +28,8 @@ interface BookingContextType {
 
   getAvailableDates: () => string[]
   getAvailableSlots: (date: string) => PresentationSlot[]
-  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }) => Promise<Booking>
+  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }, initialStatus?: 'pending' | 'confirmed') => Promise<Booking>
+  confirmBooking: (id: string) => Promise<void>
   getStudentBookings: (email: string) => Booking[]
   cancelBooking: (id: string) => Promise<void>
 
@@ -88,7 +89,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     load()
   }, [])
 
-  const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed').map(b => b.slotId))
+  const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').map(b => b.slotId))
 
   const generateSlots = useCallback(async (config: Omit<SlotConfig, 'id' | 'createdAt'>): Promise<PresentationSlot[]> => {
     const days = eachDayOfInterval({ start: parseISO(config.startDate), end: parseISO(config.endDate) })
@@ -166,7 +167,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return slots.filter(s => s.date === date && !bookedSlotIds.has(s.id)).sort((a, b) => a.time.localeCompare(b.time))
   }, [slots, bookedSlotIds])
 
-  const bookSlot = useCallback(async (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }): Promise<Booking> => {
+  const bookSlot = useCallback(async (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }, initialStatus: 'pending' | 'confirmed' = 'pending'): Promise<Booking> => {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) throw new Error('Slot not found')
 
@@ -174,7 +175,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .from('bookings')
       .select('id')
       .eq('slot_id', slotId)
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'pending'])
       .maybeSingle()
     if (slotTaken) throw new Error('This slot was just taken. Please choose another time.')
 
@@ -183,7 +184,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .select('id')
       .eq('student_email', data.studentEmail.toLowerCase())
       .eq('date', slot.date)
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'pending'])
       .maybeSingle()
     if (existing) throw new Error('You already have a booking on this date.')
 
@@ -198,7 +199,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       presentation_topic: data.presentationTopic,
       notes: data.notes,
       booking_purpose: data.bookingPurpose,
-      status: 'confirmed',
+      status: initialStatus,
     }).select().single()
     if (error) throw new Error(error.message)
 
@@ -214,6 +215,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const cancelBooking = useCallback(async (id: string) => {
     await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id)
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b))
+  }, [])
+
+  const confirmBooking = useCallback(async (id: string) => {
+    await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', id)
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'confirmed' as const } : b))
   }, [])
 
   const rescheduleBooking = useCallback(async (bookingId: string, newSlotId: string) => {
@@ -289,7 +295,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     <BookingContext.Provider value={{
       slots, bookings, slotConfigs, adminSettings, loading,
       generateSlots, removeSlot, clearAllSlots,
-      getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking,
+      getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking, confirmBooking,
       rescheduleBooking, addAdminComment,
       getLecturerSlots, getLecturerBookings,
       getBookingsForDateRange, exportBookingsCSV, updateAdminSettings,

@@ -38,7 +38,7 @@ export interface Booking {
   studentEmail: string
   presentationTopic: string
   notes: string
-  status: 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled'
   bookingPurpose: string
   adminComment: string
   createdAt: string

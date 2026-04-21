@@ -7,10 +7,10 @@ import { formatTime } from '../../components/TimeSlots'
 import type { Booking } from '../../types'
 
 type MainTab = 'bookings' | 'availability'
-type BookingFilter = 'upcoming' | 'confirmed' | 'cancelled'
+type BookingFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function LecturerDashboard() {
-  const { bookings, getLecturerBookings, getLecturerSlots, cancelBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot, bookSlot, adminSettings } = useBookings()
+  const { bookings, getLecturerBookings, getLecturerSlots, cancelBooking, confirmBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot, bookSlot, adminSettings } = useBookings()
   const { currentLecturer } = useAuth()
 
   const [mainTab, setMainTab] = useState<MainTab>('bookings')
@@ -64,16 +64,19 @@ export default function LecturerDashboard() {
   const mySlots = useMemo(() => getLecturerSlots(lecturerName), [getLecturerSlots, lecturerName])
 
   const confirmedBookings = myBookings.filter(b => b.status === 'confirmed')
+  const pendingBookings = myBookings.filter(b => b.status === 'pending')
   const bookedCount = confirmedBookings.length
-  const availableCount = mySlots.filter(s => !bookings.some(b => b.slotId === s.id && b.status === 'confirmed')).length
+  const pendingCount = pendingBookings.length
+  const availableCount = mySlots.filter(s => !bookings.some(b => b.slotId === s.id && (b.status === 'confirmed' || b.status === 'pending'))).length
 
   // ── Bookings logic ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = myBookings
     switch (filter) {
       case 'upcoming':
-        list = list.filter(b => b.status === 'confirmed' && b.date >= today)
+        list = list.filter(b => (b.status === 'confirmed' || b.status === 'pending') && b.date >= today)
         break
+      case 'pending':
       case 'confirmed':
       case 'cancelled':
         list = list.filter(b => b.status === filter)
@@ -175,7 +178,7 @@ export default function LecturerDashboard() {
         presentationTopic: addTopic.trim(),
         notes: addNotes.trim(),
         bookingPurpose: addPurpose,
-      })
+      }, 'confirmed')
       setAddBookingOpen(false)
     } catch (err) {
       setAddError(err instanceof Error ? err.message : 'Failed to create booking.')
@@ -246,7 +249,8 @@ export default function LecturerDashboard() {
 
   const bookingTabs: { key: BookingFilter; label: string }[] = [
     { key: 'upcoming', label: 'Upcoming' },
-    { key: 'confirmed', label: 'All Confirmed' },
+    { key: 'pending', label: `Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
+    { key: 'confirmed', label: 'Confirmed' },
     { key: 'cancelled', label: 'Cancelled' },
   ]
 
@@ -274,10 +278,11 @@ export default function LecturerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6 stagger-children">
+        <div className="grid grid-cols-4 gap-4 mb-6 stagger-children">
           {[
             { label: 'Total Slots', value: mySlots.length, color: 'text-[var(--text-primary)]' },
-            { label: 'Booked', value: bookedCount, color: 'text-[var(--accent)]' },
+            { label: 'Confirmed', value: bookedCount, color: 'text-[var(--accent)]' },
+            { label: 'Pending', value: pendingCount, color: 'text-amber-500' },
             { label: 'Available', value: availableCount, color: 'text-emerald-600' },
           ].map(stat => (
             <div key={stat.label} className="bg-white rounded-xl border border-[var(--border)] p-4">
@@ -376,7 +381,7 @@ export default function LecturerDashboard() {
                       {items.map((booking, i) => (
                         <div
                           key={booking.id}
-                          className={`bg-white rounded-xl border border-[var(--border)] overflow-hidden hover:shadow-sm transition-shadow animate-fade-in-up ${booking.status === 'cancelled' ? 'opacity-50' : ''}`}
+                          className={`bg-white rounded-xl border overflow-hidden hover:shadow-sm transition-shadow animate-fade-in-up ${booking.status === 'cancelled' ? 'opacity-50 border-[var(--border)]' : booking.status === 'pending' ? 'border-amber-200 bg-amber-50/30' : 'border-[var(--border)]'}`}
                           style={{ animationDelay: `${Math.min(i * 30, 200)}ms` }}
                         >
                           <div className="p-4 sm:p-5 flex items-center gap-5">
@@ -414,7 +419,25 @@ export default function LecturerDashboard() {
                               >
                                 <MessageSquare className="w-4 h-4" />
                               </button>
-                              {booking.status === 'confirmed' ? (
+                              {booking.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => confirmBooking(booking.id)}
+                                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors"
+                                    title="Confirm booking"
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5" /> Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => cancelBooking(booking.id)}
+                                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    title="Cancel booking"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {booking.status === 'confirmed' && (
                                 <>
                                   {booking.date >= today && (
                                     <button
@@ -433,7 +456,8 @@ export default function LecturerDashboard() {
                                     <X className="w-4 h-4" />
                                   </button>
                                 </>
-                              ) : (
+                              )}
+                              {booking.status === 'cancelled' && (
                                 <span className="text-xs font-medium text-red-400 bg-red-50 px-2.5 py-1 rounded-md ml-1">Cancelled</span>
                               )}
                             </div>
