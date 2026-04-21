@@ -4,7 +4,7 @@ import { CalendarDays, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export default function AdminLogin() {
-  const { isAdmin, loading, login } = useAuth()
+  const { isAdmin, isLecturer, loading, login } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -13,10 +13,10 @@ export default function AdminLogin() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!loading && isAdmin) {
-      navigate('/admin/dashboard', { replace: true })
-    }
-  }, [isAdmin, loading, navigate])
+    if (loading) return
+    if (isAdmin) navigate('/admin/dashboard', { replace: true })
+    else if (isLecturer) navigate('/lecturer/dashboard', { replace: true })
+  }, [isAdmin, isLecturer, loading, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -40,7 +40,7 @@ export default function AdminLogin() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--accent-light)] mb-4">
             <CalendarDays className="w-6 h-6 text-[var(--accent)]" />
           </div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Admin Login</h1>
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">Staff Login</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">Sign in to manage presentation slots.</p>
         </div>
 

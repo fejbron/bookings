@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { BookingProvider } from './context/BookingContext'
 import { AuthProvider } from './context/AuthContext'
 import AdminGuard from './components/AdminGuard'
+import LecturerGuard from './components/LecturerGuard'
 import Sidebar from './components/Navbar'
 import Home from './pages/Home'
 import Book from './pages/Book'
@@ -11,6 +12,8 @@ import AdminLogin from './pages/admin/Login'
 import Dashboard from './pages/admin/Dashboard'
 import ManageSlots from './pages/admin/ManageSlots'
 import Settings from './pages/admin/Settings'
+import Lecturers from './pages/admin/Lecturers'
+import LecturerDashboard from './pages/lecturer/Dashboard'
 
 export default function App() {
   return (
@@ -49,6 +52,22 @@ export default function App() {
                     <AdminGuard>
                       <Settings />
                     </AdminGuard>
+                  }
+                />
+                <Route
+                  path="/admin/lecturers"
+                  element={
+                    <AdminGuard>
+                      <Lecturers />
+                    </AdminGuard>
+                  }
+                />
+                <Route
+                  path="/lecturer/dashboard"
+                  element={
+                    <LecturerGuard>
+                      <LecturerDashboard />
+                    </LecturerGuard>
                   }
                 />
               </Routes>

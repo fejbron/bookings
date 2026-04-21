@@ -1,3 +1,11 @@
+export interface LecturerProfile {
+  id: string
+  name: string
+  email: string
+  classGroup?: string
+  createdAt: string
+}
+
 export interface PresentationSlot {
   id: string
   date: string

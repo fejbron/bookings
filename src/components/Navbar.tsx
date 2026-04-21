@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { CalendarCheck, LayoutGrid, Clock, Settings as SettingsIcon, LogOut, Menu, X, CalendarDays, BookOpen, Shield } from 'lucide-react'
+import { CalendarCheck, LayoutGrid, Clock, Settings as SettingsIcon, LogOut, Menu, X, CalendarDays, BookOpen, Shield, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useBookings } from '../context/BookingContext'
@@ -13,28 +13,33 @@ const studentLinks = [
 const adminLinks = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
   { to: '/admin/slots', label: 'Availability', icon: Clock },
+  { to: '/admin/lecturers', label: 'Lecturers', icon: Users },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+]
+
+const lecturerLinks = [
+  { to: '/lecturer/dashboard', label: 'My Bookings', icon: LayoutGrid },
 ]
 
 export default function Sidebar() {
   const { pathname } = useLocation()
-  const { isAdmin, logout } = useAuth()
-  const { bookings } = useBookings()
+  const { isAdmin, isLecturer, currentLecturer, logout } = useAuth()
+  const { bookings, getLecturerBookings } = useBookings()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const links = isAdmin ? adminLinks : studentLinks
+  const links = isAdmin ? adminLinks : isLecturer ? lecturerLinks : studentLinks
   const isActive = (to: string) => pathname === to || (to !== '/' && pathname.startsWith(to))
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
-  const todayBookingCount = bookings.filter(
-    b => b.status === 'confirmed' && b.date === todayStr
-  ).length
+  const todayBookingCount = isLecturer && currentLecturer
+    ? getLecturerBookings(currentLecturer.name).filter(b => b.status === 'confirmed' && b.date === todayStr).length
+    : bookings.filter(b => b.status === 'confirmed' && b.date === todayStr).length
 
   const sidebarContent = (
     <>
       {/* Logo */}
       <Link
-        to={isAdmin ? '/admin/dashboard' : '/'}
+        to={isAdmin ? '/admin/dashboard' : isLecturer ? '/lecturer/dashboard' : '/'}
         className="flex items-center gap-2.5 px-6 mb-8"
         onClick={() => setMobileOpen(false)}
       >
@@ -43,6 +48,11 @@ export default function Sidebar() {
         {isAdmin && (
           <span className="text-[10px] font-semibold bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-md uppercase tracking-wider">
             Admin
+          </span>
+        )}
+        {isLecturer && (
+          <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-wider">
+            Lecturer
           </span>
         )}
       </Link>
@@ -79,7 +89,7 @@ export default function Sidebar() {
               >
                 <Icon className="w-[18px] h-[18px]" />
                 {label}
-                {label === 'Dashboard' && todayBookingCount > 0 && (
+                {(label === 'Dashboard' || label === 'My Bookings') && todayBookingCount > 0 && (
                   <span className="ml-auto text-[10px] font-semibold bg-[var(--accent)] text-white w-5 h-5 rounded-full flex items-center justify-center">
                     {todayBookingCount}
                   </span>
@@ -92,14 +102,22 @@ export default function Sidebar() {
 
       {/* Bottom */}
       <div className="px-3 mt-auto pt-4 border-t border-[var(--border)]">
-        {isAdmin ? (
-          <button
-            onClick={() => { void logout(); setMobileOpen(false) }}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-100 hover:text-red-600 transition-colors w-full"
-          >
-            <LogOut className="w-[18px] h-[18px]" />
-            Logout
-          </button>
+        {(isAdmin || isLecturer) ? (
+          <div className="space-y-1">
+            {isLecturer && currentLecturer && (
+              <div className="px-4 py-2 text-xs text-[var(--text-muted)] truncate">
+                {currentLecturer.name}
+                {currentLecturer.classGroup && <span className="block text-[var(--text-muted)] opacity-70">{currentLecturer.classGroup}</span>}
+              </div>
+            )}
+            <button
+              onClick={() => { void logout(); setMobileOpen(false) }}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-100 hover:text-red-600 transition-colors w-full"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+              Logout
+            </button>
+          </div>
         ) : (
           <Link
             to="/admin"
@@ -107,7 +125,7 @@ export default function Sidebar() {
             className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--text-muted)] hover:bg-gray-100 hover:text-[var(--text-secondary)] transition-colors"
           >
             <Shield className="w-[18px] h-[18px]" />
-            Admin
+            Staff Login
           </Link>
         )}
       </div>

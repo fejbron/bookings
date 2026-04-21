@@ -35,6 +35,9 @@ interface BookingContextType {
   rescheduleBooking: (bookingId: string, newSlotId: string) => Promise<void>
   addAdminComment: (bookingId: string, comment: string) => Promise<void>
 
+  getLecturerSlots: (lecturerName: string) => PresentationSlot[]
+  getLecturerBookings: (lecturerName: string) => Booking[]
+
   getBookingsForDateRange: (start: string, end: string) => Booking[]
   exportBookingsCSV: () => void
   updateAdminSettings: (settings: Partial<AdminSettings>) => Promise<void>
@@ -246,6 +249,17 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, adminComment: comment } : b))
   }, [])
 
+  const getLecturerSlots = useCallback((lecturerName: string): PresentationSlot[] => {
+    return slots.filter(s => s.lecturerName?.toLowerCase() === lecturerName.toLowerCase())
+  }, [slots])
+
+  const getLecturerBookings = useCallback((lecturerName: string): Booking[] => {
+    const lecturerSlotIds = new Set(
+      slots.filter(s => s.lecturerName?.toLowerCase() === lecturerName.toLowerCase()).map(s => s.id)
+    )
+    return bookings.filter(b => lecturerSlotIds.has(b.slotId))
+  }, [slots, bookings])
+
   const getBookingsForDateRange = useCallback((start: string, end: string): Booking[] => {
     return bookings.filter(b => b.date >= start && b.date <= end)
   }, [bookings])
@@ -277,6 +291,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       generateSlots, removeSlot, clearAllSlots,
       getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking,
       rescheduleBooking, addAdminComment,
+      getLecturerSlots, getLecturerBookings,
       getBookingsForDateRange, exportBookingsCSV, updateAdminSettings,
     }}>
       {children}
