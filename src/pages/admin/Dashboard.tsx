@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Clock, Search, AlertCircle, Download, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle } from 'lucide-react'
+import { Clock, Search, AlertCircle, Download, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle, Plus, User, Mail, Presentation, FileText, Tag } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 import type { Booking } from '../../types'
@@ -8,7 +8,7 @@ import type { Booking } from '../../types'
 type TabFilter = 'upcoming' | 'confirmed' | 'cancelled'
 
 export default function Dashboard() {
-  const { bookings, slots, cancelBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots } = useBookings()
+  const { bookings, slots, cancelBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [dateFrom, setDateFrom] = useState('')
@@ -25,6 +25,19 @@ export default function Dashboard() {
   const [commentModal, setCommentModal] = useState<Booking | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
+
+  // New booking modal state
+  const [newBookingOpen, setNewBookingOpen] = useState(false)
+  const [nbDate, setNbDate] = useState('')
+  const [nbSlotId, setNbSlotId] = useState('')
+  const [nbName, setNbName] = useState('')
+  const [nbEmail, setNbEmail] = useState('')
+  const [nbTopic, setNbTopic] = useState('')
+  const [nbPurpose, setNbPurpose] = useState('')
+  const [nbNotes, setNbNotes] = useState('')
+  const [nbErrors, setNbErrors] = useState<Record<string, string>>({})
+  const [nbLoading, setNbLoading] = useState(false)
+  const [nbError, setNbError] = useState('')
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -73,6 +86,51 @@ export default function Dashboard() {
     if (!rescheduleDate || !rescheduleModal) return []
     return getAvailableSlots(rescheduleDate)
   }, [rescheduleDate, rescheduleModal, getAvailableSlots])
+
+  const availableSlotsForNewBooking = useMemo(() => {
+    if (!nbDate) return []
+    return getAvailableSlots(nbDate)
+  }, [nbDate, getAvailableSlots])
+
+  function openNewBooking() {
+    setNewBookingOpen(true)
+    setNbDate(''); setNbSlotId(''); setNbName(''); setNbEmail('')
+    setNbTopic(''); setNbPurpose(''); setNbNotes('')
+    setNbErrors({}); setNbError('')
+  }
+
+  function validateNewBooking(): boolean {
+    const errs: Record<string, string> = {}
+    if (!nbDate) errs.date = 'Select a date.'
+    if (!nbSlotId) errs.slot = 'Select a time slot.'
+    if (!nbName.trim()) errs.name = 'Full name is required.'
+    if (!nbEmail.trim()) errs.email = 'Email is required.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nbEmail.trim())) errs.email = 'Enter a valid email.'
+    if (!nbTopic.trim()) errs.topic = 'Presentation topic is required.'
+    if (adminSettings.bookingPurposes.length > 0 && !nbPurpose) errs.purpose = 'Select a purpose.'
+    setNbErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  async function handleNewBooking() {
+    if (!validateNewBooking()) return
+    setNbLoading(true)
+    setNbError('')
+    try {
+      await bookSlot(nbSlotId, {
+        studentName: nbName.trim(),
+        studentEmail: nbEmail.trim(),
+        presentationTopic: nbTopic.trim(),
+        notes: nbNotes.trim(),
+        bookingPurpose: nbPurpose,
+      })
+      setNewBookingOpen(false)
+    } catch (err) {
+      setNbError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setNbLoading(false)
+    }
+  }
 
   function openReschedule(booking: Booking) {
     setRescheduleModal(booking)
@@ -127,14 +185,23 @@ export default function Dashboard() {
               <h1 className="text-2xl font-bold text-[var(--text-primary)]">Bookings</h1>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">See your scheduled events from student bookings.</p>
             </div>
-            <button
-              onClick={exportBookingsCSV}
-              disabled={confirmedBookings.length === 0}
-              className="flex items-center gap-2 border border-[var(--border)] text-[var(--text-secondary)] px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openNewBooking}
+                className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-4 h-4" />
+                New Booking
+              </button>
+              <button
+                onClick={exportBookingsCSV}
+                disabled={confirmedBookings.length === 0}
+                className="flex items-center gap-2 border border-[var(--border)] text-[var(--text-secondary)] px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+            </div>
           </div>
         </div>
 
@@ -329,6 +396,146 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ── New Booking Modal ── */}
+      {newBookingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={e => { if (e.target === e.currentTarget) setNewBookingOpen(false) }}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-fade-in-up flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-[var(--border)] shrink-0">
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">Book a Slot</h2>
+              <button onClick={() => setNewBookingOpen(false)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-gray-100 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 space-y-4">
+              {/* Date */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Date</label>
+                <input
+                  type="date"
+                  min={today}
+                  value={nbDate}
+                  onChange={e => { setNbDate(e.target.value); setNbSlotId(''); setNbErrors(prev => ({ ...prev, date: '', slot: '' })) }}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                />
+                {nbErrors.date && <p className="mt-1 text-xs text-red-500">{nbErrors.date}</p>}
+              </div>
+
+              {/* Time slot */}
+              {nbDate && (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Time Slot</label>
+                  {availableSlotsForNewBooking.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] py-1">No available slots on this date.</p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableSlotsForNewBooking.map(slot => (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => { setNbSlotId(slot.id); setNbErrors(prev => ({ ...prev, slot: '' })) }}
+                          className={`px-2 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                            nbSlotId === slot.id
+                              ? 'border-[var(--accent)] bg-orange-50 text-[var(--accent)]'
+                              : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:bg-orange-50/50'
+                          }`}
+                        >
+                          {formatTime(slot.time)}
+                          <span className="block text-xs text-[var(--text-muted)] font-normal">{slot.duration}min</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {nbErrors.slot && <p className="mt-1 text-xs text-red-500">{nbErrors.slot}</p>}
+                </div>
+              )}
+
+              {/* Purpose chips */}
+              {adminSettings.bookingPurposes.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 flex items-center gap-1">
+                    <Tag className="w-3 h-3" /> Purpose
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {adminSettings.bookingPurposes.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => { setNbPurpose(p); setNbErrors(prev => ({ ...prev, purpose: '' })) }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          nbPurpose === p
+                            ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  {nbErrors.purpose && <p className="mt-1 text-xs text-red-500">{nbErrors.purpose}</p>}
+                </div>
+              )}
+
+              {/* Student fields */}
+              {[
+                { icon: User, label: 'Full Name', key: 'name', type: 'text', val: nbName, set: setNbName, placeholder: 'Jane Smith', max: 100 },
+                { icon: Mail, label: 'Email', key: 'email', type: 'email', val: nbEmail, set: setNbEmail, placeholder: 'student@example.com', max: 254 },
+                { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: nbTopic, set: setNbTopic, placeholder: 'e.g. Final Year Project Demo', max: 200 },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 flex items-center gap-1">
+                    <f.icon className="w-3 h-3" /> {f.label}
+                  </label>
+                  <input
+                    type={f.type}
+                    value={f.val}
+                    onChange={e => { f.set(e.target.value); setNbErrors(prev => ({ ...prev, [f.key]: '' })) }}
+                    placeholder={f.placeholder}
+                    maxLength={f.max}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${nbErrors[f.key] ? 'border-red-300' : 'border-[var(--border)]'}`}
+                  />
+                  {nbErrors[f.key] && <p className="mt-1 text-xs text-red-500">{nbErrors[f.key]}</p>}
+                </div>
+              ))}
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> Notes (optional)
+                </label>
+                <textarea
+                  value={nbNotes}
+                  onChange={e => setNbNotes(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Any additional notes…"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
+                />
+              </div>
+
+              {nbError && <p className="text-xs text-red-500">{nbError}</p>}
+            </div>
+
+            <div className="flex gap-2 p-5 pt-0 shrink-0">
+              <button
+                onClick={() => setNewBookingOpen(false)}
+                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNewBooking}
+                disabled={nbLoading}
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {nbLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Confirm Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Reschedule Modal ── */}
       {rescheduleModal && (
