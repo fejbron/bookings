@@ -117,7 +117,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     if (rows.length === 0) return []
 
     const { data: slotData, error: slotErr } = await supabase.from('slots').insert(rows).select()
-    if (slotErr) throw slotErr
+    if (slotErr) throw new Error(slotErr.message)
 
     const { data: configData } = await supabase.from('slot_configs').insert({
       id: crypto.randomUUID(),
@@ -200,7 +200,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       booking_purpose: data.bookingPurpose,
       status: 'confirmed',
     }).select().single()
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     const booking = toBooking(inserted)
     setBookings(prev => [booking, ...prev])
@@ -232,7 +232,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .from('bookings')
       .update({ slot_id: newSlotId, date: newSlot.date, time: newSlot.time, duration: newSlot.duration })
       .eq('id', bookingId)
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     setBookings(prev => prev.map(b => b.id === bookingId
       ? { ...b, slotId: newSlotId, date: newSlot.date, time: newSlot.time, duration: newSlot.duration }
@@ -245,7 +245,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .from('bookings')
       .update({ admin_comment: comment })
       .eq('id', bookingId)
-    if (error) throw error
+    if (error) throw new Error(error.message)
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, adminComment: comment } : b))
   }, [])
 
