@@ -34,6 +34,10 @@ export default function ManageSlots() {
     } catch { return null }
   }, [canGenerate, startDate, endDate, startTime, endTime, duration, excludeWeekends])
 
+  const [showPast, setShowPast] = useState(false)
+
+  const today = new Date().toISOString().slice(0, 10)
+
   const groupedSlots = useMemo(() => {
     const groups: Record<string, typeof slots> = {}
     const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
@@ -44,7 +48,10 @@ export default function ManageSlots() {
     return groups
   }, [slots])
 
-  const dates = Object.keys(groupedSlots).sort()
+  const allDates = Object.keys(groupedSlots).sort()
+  const pastDates = allDates.filter(d => d < today)
+  const upcomingDates = allDates.filter(d => d >= today)
+  const visibleDates = showPast ? allDates : upcomingDates
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
@@ -178,7 +185,8 @@ export default function ManageSlots() {
         {/* Slots list header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-            All Slots <span className="text-[var(--text-muted)] font-normal">({slots.length})</span>
+            {showPast ? 'All Slots' : 'Upcoming Slots'}{' '}
+            <span className="text-[var(--text-muted)] font-normal">({visibleDates.length} date{visibleDates.length !== 1 ? 's' : ''})</span>
           </h2>
           {slots.length > 0 && (
             showClearConfirm ? (
@@ -195,19 +203,39 @@ export default function ManageSlots() {
           )}
         </div>
 
-        {dates.length === 0 ? (
+        {allDates.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
             <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="text-sm text-[var(--text-muted)]">No slots yet. Use the form above to generate slots.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {dates.map((date, di) => {
+            {/* Past dates toggle */}
+            {pastDates.length > 0 && (
+              <button
+                onClick={() => setShowPast(p => !p)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                {showPast
+                  ? 'Hide past dates'
+                  : `Show ${pastDates.length} past date${pastDates.length !== 1 ? 's' : ''}`}
+              </button>
+            )}
+
+            {upcomingDates.length === 0 && !showPast && (
+              <div className="bg-white rounded-xl border border-[var(--border)] p-10 text-center">
+                <p className="text-sm text-[var(--text-muted)]">No upcoming slots. Generate new slots above.</p>
+              </div>
+            )}
+
+            {visibleDates.map((date, di) => {
+              const isPast = date < today
               const ds = groupedSlots[date]
               const bookedInDay = ds.filter(s => bookedSlotIds.has(s.id)).length
               const pct = Math.round((bookedInDay / ds.length) * 100)
               return (
-                <div key={date} className="bg-white rounded-xl border border-[var(--border)] overflow-hidden animate-fade-in-up" style={{ animationDelay: `${Math.min(di * 40, 240)}ms` }}>
+                <div key={date} className={`rounded-xl border overflow-hidden animate-fade-in-up ${isPast ? 'bg-gray-50 border-[var(--border)] opacity-60' : 'bg-white border-[var(--border)]'}`} style={{ animationDelay: `${Math.min(di * 40, 240)}ms` }}>
                   <div className="px-4 py-3 flex items-center gap-2 border-b border-[var(--border)]">
                     <Calendar className="w-4 h-4 text-[var(--accent)]" />
                     <span className="text-sm font-semibold text-[var(--text-primary)]">{format(parseISO(date), 'EEEE, MMMM d, yyyy')}</span>
