@@ -174,7 +174,7 @@ export default function LecturerDashboard() {
     try {
       const result = await generateSlots({
         startDate, endDate, startTime, endTime, duration, excludeWeekends,
-        lecturerName: lecturerName,
+        lecturerName,
         classGroup: classGroup.trim() || undefined,
       })
       setGenerated(result.length)
@@ -260,7 +260,6 @@ export default function LecturerDashboard() {
         {/* ── BOOKINGS TAB ── */}
         {mainTab === 'bookings' && (
           <>
-            {/* Sub-tabs */}
             <div className="flex items-center gap-0 border-b border-[var(--border)] mb-6">
               {bookingTabs.map(tab => (
                 <button
@@ -277,7 +276,6 @@ export default function LecturerDashboard() {
               ))}
             </div>
 
-            {/* Search & Date Filter */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
@@ -402,7 +400,6 @@ export default function LecturerDashboard() {
         {/* ── AVAILABILITY TAB ── */}
         {mainTab === 'availability' && (
           <>
-            {/* Generate form */}
             <form onSubmit={handleGenerate} className="bg-white rounded-xl border border-[var(--border)] p-5 sm:p-6 mb-8 animate-fade-in-up">
               <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[var(--accent)]" />
@@ -495,7 +492,6 @@ export default function LecturerDashboard() {
               </div>
             </form>
 
-            {/* Slots list */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[var(--text-primary)]">
                 {showPast ? 'All My Slots' : 'Upcoming Slots'}{' '}
@@ -551,9 +547,7 @@ export default function LecturerDashboard() {
                               <Clock className="w-3 h-3 opacity-50" />
                               <span className="font-medium">{formatTime(slot.time)}</span>
                               <span className="opacity-60">{slot.duration}m</span>
-                              {slot.classGroup && (
-                                <span className="opacity-70">{slot.classGroup}</span>
-                              )}
+                              {slot.classGroup && <span className="opacity-70">{slot.classGroup}</span>}
                               {isBooked ? (
                                 <span className="text-[10px] bg-orange-100 text-[var(--accent)] px-1.5 py-0.5 rounded font-medium">Booked</span>
                               ) : deleteConfirmSlot === slot.id ? (
