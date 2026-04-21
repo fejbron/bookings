@@ -3,9 +3,21 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { LecturerProfile } from '../types'
 
-function toLecturer(r: { id: string; name: string; email: string; class_group: string | null; created_at: string }): LecturerProfile {
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toLecturer(r: any): LecturerProfile {
   return { id: r.id, name: r.name, email: r.email, classGroup: r.class_group ?? undefined, createdAt: r.created_at }
 }
+
+async function hashPassword(password: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const LECTURER_SESSION_KEY = 'bookslot_lecturer_session'
+
+// ── context types ────────────────────────────────────────────────────────────
 
 interface AuthContextType {
   user: User | null
@@ -24,56 +36,70 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+// ── provider ─────────────────────────────────────────────────────────────────
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLecturer, setIsLecturer] = useState(false)
-  const [currentLecturer, setCurrentLecturer] = useState<LecturerProfile | null>(null)
-  const [lecturers, setLecturers] = useState<LecturerProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [lecturers, setLecturers] = useState<LecturerProfile[]>([])
 
-  const resolveRole = useCallback(async (authUser: User | null) => {
-    if (!authUser) {
-      setUser(null)
-      setIsLecturer(false)
-      setCurrentLecturer(null)
-      return
-    }
-    const { data } = await supabase
-      .from('lecturer_profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .maybeSingle()
-    setUser(authUser)
-    if (data) {
-      setIsLecturer(true)
-      setCurrentLecturer(toLecturer(data))
-    } else {
-      setIsLecturer(false)
-      setCurrentLecturer(null)
-    }
-  }, [])
+  // Lecturer session lives in localStorage — no Supabase Auth needed for lecturers
+  const [lecturerUser, setLecturerUser] = useState<LecturerProfile | null>(() => {
+    try {
+      const stored = localStorage.getItem(LECTURER_SESSION_KEY)
+      return stored ? (JSON.parse(stored) as LecturerProfile) : null
+    } catch { return null }
+  })
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await resolveRole(session?.user ?? null)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
       setLoading(false)
     })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      resolveRole(session?.user ?? null)
+      setUser(session?.user ?? null)
     })
-
     return () => subscription.unsubscribe()
-  }, [resolveRole])
+  }, [])
+
+  // ── login: check lecturer table first, then Supabase Auth for admin ────────
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return error ? error.message : null
+    const normalised = email.toLowerCase().trim()
+
+    // Check lecturer_profiles first
+    const { data: lecturerRow } = await supabase
+      .from('lecturer_profiles')
+      .select('id, name, email, password, class_group, created_at')
+      .eq('email', normalised)
+      .maybeSingle()
+
+    if (lecturerRow) {
+      const hash = await hashPassword(password)
+      if (lecturerRow.password !== hash) return 'Invalid email or password.'
+      const profile = toLecturer(lecturerRow)
+      setLecturerUser(profile)
+      localStorage.setItem(LECTURER_SESSION_KEY, JSON.stringify(profile))
+      return null
+    }
+
+    // Fall through to admin (Supabase Auth)
+    const { error } = await supabase.auth.signInWithPassword({ email: normalised, password })
+    return error ? 'Invalid email or password.' : null
   }, [])
 
+  // ── logout ────────────────────────────────────────────────────────────────
+
   const logout = useCallback(async () => {
-    await supabase.auth.signOut()
-  }, [])
+    if (lecturerUser) {
+      setLecturerUser(null)
+      localStorage.removeItem(LECTURER_SESSION_KEY)
+    } else {
+      await supabase.auth.signOut()
+    }
+  }, [lecturerUser])
+
+  // ── admin: change password ────────────────────────────────────────────────
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<string | null> => {
     if (!user?.email) return 'Not authenticated'
@@ -83,48 +109,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? error.message : null
   }, [user])
 
+  // ── lecturer management (admin only) ─────────────────────────────────────
+
   const loadLecturers = useCallback(async () => {
     const { data, error } = await supabase
       .from('lecturer_profiles')
-      .select('*')
+      .select('id, name, email, class_group, created_at')
       .order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
     setLecturers((data ?? []).map(toLecturer))
   }, [])
 
   const createLecturerAccount = useCallback(async (name: string, email: string, password: string, classGroup: string) => {
-    // Save admin session before signUp potentially overwrites it
-    const { data: { session: adminSession } } = await supabase.auth.getSession()
-    if (!adminSession) throw new Error('Not authenticated')
-
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const hash = await hashPassword(password)
+    const { data: inserted, error } = await supabase.from('lecturer_profiles').insert({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hash,
+      class_group: classGroup.trim() || null,
+    }).select('id, name, email, class_group, created_at').single()
     if (error) throw new Error(error.message)
 
-    const lecturerId = data.user?.id
-    if (!lecturerId) throw new Error('Failed to create user account. Check that email confirmation is disabled in your Supabase project (Auth → Settings → Email confirmation).')
-
-    // Restore admin session in case signUp changed it
-    await supabase.auth.setSession({
-      access_token: adminSession.access_token,
-      refresh_token: adminSession.refresh_token,
-    })
-
-    const { error: profileError } = await supabase.from('lecturer_profiles').insert({
-      id: lecturerId,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      class_group: classGroup.trim() || null,
-    })
-    if (profileError) throw new Error(profileError.message)
-
-    setLecturers(prev => [{
-      id: lecturerId,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      classGroup: classGroup.trim() || undefined,
-      createdAt: new Date().toISOString(),
-    }, ...prev])
-  }, [])
+    // Optimistically add the new lecturer, then try to sync from DB
+    if (inserted) {
+      setLecturers(prev => [toLecturer(inserted), ...prev])
+    }
+    // Also attempt a full reload (may be a no-op if RLS blocks SELECT)
+    loadLecturers().catch(() => {/* silently ignore if reload fails */})
+  }, [loadLecturers])
 
   const deleteLecturerAccount = useCallback(async (id: string) => {
     const { error } = await supabase.from('lecturer_profiles').delete().eq('id', id)
@@ -132,7 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLecturers(prev => prev.filter(l => l.id !== id))
   }, [])
 
+  const isLecturer = !!lecturerUser
   const isAdmin = !!user && !isLecturer
+  const currentLecturer = lecturerUser
 
   return (
     <AuthContext.Provider value={{

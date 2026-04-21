@@ -222,6 +222,13 @@ export default function Lecturers() {
           <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
             <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="text-sm text-[var(--text-muted)]">No lecturer accounts yet. Add one above.</p>
+            {!loadError && (
+              <p className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 inline-block">
+                If you've already added lecturers but don't see them, run this in your Supabase SQL editor:
+                <br />
+                <code className="font-mono font-bold">ALTER TABLE lecturer_profiles DISABLE ROW LEVEL SECURITY;</code>
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -249,7 +256,7 @@ export default function Lecturers() {
 
                 {/* Date */}
                 <p className="text-xs text-[var(--text-muted)] shrink-0 hidden sm:block">
-                  Added {format(parseISO(lecturer.createdAt), 'MMM d, yyyy')}
+                  {lecturer.createdAt ? `Added ${format(parseISO(lecturer.createdAt), 'MMM d, yyyy')}` : ''}
                 </p>
 
                 {/* Delete */}
