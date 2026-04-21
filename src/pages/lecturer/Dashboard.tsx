@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Clock, Search, AlertCircle, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle, AlertTriangle, Plus, Trash2, Calendar, Info } from 'lucide-react'
+import { Clock, Search, AlertCircle, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle, AlertTriangle, Plus, Trash2, Calendar, Info, UserPlus } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
@@ -10,7 +10,7 @@ type MainTab = 'bookings' | 'availability'
 type BookingFilter = 'upcoming' | 'confirmed' | 'cancelled'
 
 export default function LecturerDashboard() {
-  const { bookings, getLecturerBookings, getLecturerSlots, cancelBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot } = useBookings()
+  const { bookings, getLecturerBookings, getLecturerSlots, cancelBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot, bookSlot, adminSettings } = useBookings()
   const { currentLecturer } = useAuth()
 
   const [mainTab, setMainTab] = useState<MainTab>('bookings')
@@ -30,6 +30,18 @@ export default function LecturerDashboard() {
   const [commentModal, setCommentModal] = useState<Booking | null>(null)
   const [commentDraft, setCommentDraft] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
+
+  // ── Add booking state ───────────────────────────────────────────────────────
+  const [addBookingOpen, setAddBookingOpen] = useState(false)
+  const [addSlotId, setAddSlotId] = useState('')
+  const [addDate, setAddDate] = useState('')
+  const [addStudentName, setAddStudentName] = useState('')
+  const [addStudentEmail, setAddStudentEmail] = useState('')
+  const [addTopic, setAddTopic] = useState('')
+  const [addPurpose, setAddPurpose] = useState('')
+  const [addNotes, setAddNotes] = useState('')
+  const [addLoading, setAddLoading] = useState(false)
+  const [addError, setAddError] = useState('')
 
   // ── Availability state ──────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState('')
@@ -131,6 +143,44 @@ export default function LecturerDashboard() {
       setCommentModal(null)
     } finally {
       setCommentLoading(false)
+    }
+  }
+
+  const addBookingSlotsForDate = useMemo(() => {
+    if (!addDate) return []
+    return getAvailableSlots(addDate).filter(s => s.lecturerName?.toLowerCase() === lecturerName.toLowerCase())
+  }, [addDate, getAvailableSlots, lecturerName])
+
+  function openAddBooking() {
+    setAddBookingOpen(true)
+    setAddDate('')
+    setAddSlotId('')
+    setAddStudentName('')
+    setAddStudentEmail('')
+    setAddTopic('')
+    setAddPurpose(adminSettings.bookingPurposes[0] ?? '')
+    setAddNotes('')
+    setAddError('')
+  }
+
+  async function handleAddBooking(e: React.FormEvent) {
+    e.preventDefault()
+    if (!addSlotId) { setAddError('Please select a time slot.'); return }
+    setAddLoading(true)
+    setAddError('')
+    try {
+      await bookSlot(addSlotId, {
+        studentName: addStudentName.trim(),
+        studentEmail: addStudentEmail.trim(),
+        presentationTopic: addTopic.trim(),
+        notes: addNotes.trim(),
+        bookingPurpose: addPurpose,
+      })
+      setAddBookingOpen(false)
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Failed to create booking.')
+    } finally {
+      setAddLoading(false)
     }
   }
 
@@ -260,20 +310,28 @@ export default function LecturerDashboard() {
         {/* ── BOOKINGS TAB ── */}
         {mainTab === 'bookings' && (
           <>
-            <div className="flex items-center gap-0 border-b border-[var(--border)] mb-6">
-              {bookingTabs.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key)}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                    filter === tab.key
-                      ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-0 border-b border-[var(--border)] flex-1">
+                {bookingTabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setFilter(tab.key)}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                      filter === tab.key
+                        ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
+                        : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={openAddBooking}
+                className="ml-4 flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity shrink-0"
+              >
+                <UserPlus className="w-4 h-4" /> Add Booking
+              </button>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
@@ -664,6 +722,99 @@ export default function LecturerDashboard() {
                 Save Note
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Booking Modal ── */}
+      {addBookingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={e => { if (e.target === e.currentTarget) setAddBookingOpen(false) }}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-fade-in-up">
+            <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">Add Booking</h2>
+              <button onClick={() => setAddBookingOpen(false)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-gray-100 transition-colors"><X className="w-4 h-4" /></button>
+            </div>
+            <form onSubmit={handleAddBooking} className="p-5 space-y-4">
+              {/* Date + slot */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Date</label>
+                  <input type="date" min={today} value={addDate}
+                    onChange={e => { setAddDate(e.target.value); setAddSlotId('') }}
+                    required
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Time Slot</label>
+                  {addDate ? (
+                    addBookingSlotsForDate.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)] pt-2">No available slots on this date.</p>
+                    ) : (
+                      <select value={addSlotId} onChange={e => setAddSlotId(e.target.value)} required
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white">
+                        <option value="">— Select —</option>
+                        {addBookingSlotsForDate.map(s => (
+                          <option key={s.id} value={s.id}>{formatTime(s.time)} · {s.duration}m</option>
+                        ))}
+                      </select>
+                    )
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)] pt-2">Pick a date first.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Student details */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Student Name</label>
+                <input type="text" value={addStudentName} onChange={e => setAddStudentName(e.target.value)}
+                  placeholder="Full name" required maxLength={100}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Student Email</label>
+                <input type="email" value={addStudentEmail} onChange={e => setAddStudentEmail(e.target.value)}
+                  placeholder="student@example.com" required maxLength={254}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Presentation Topic</label>
+                <input type="text" value={addTopic} onChange={e => setAddTopic(e.target.value)}
+                  placeholder="Topic title" required maxLength={200}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
+              </div>
+              {adminSettings.bookingPurposes.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Purpose</label>
+                  <select value={addPurpose} onChange={e => setAddPurpose(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white">
+                    {adminSettings.bookingPurposes.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Notes <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
+                <textarea value={addNotes} onChange={e => setAddNotes(e.target.value)}
+                  placeholder="Any additional notes…" rows={2} maxLength={500}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none" />
+              </div>
+
+              {addError && (
+                <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{addError}</p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setAddBookingOpen(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={addLoading}
+                  className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  {addLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {addLoading ? 'Saving…' : 'Add Booking'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
