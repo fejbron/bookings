@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalised = email.toLowerCase().trim()
 
     // Check lecturer_profiles first
-    const { data: lecturerRow } = await supabase
+    const { data: lecturerRow, error: lecturerErr } = await supabase
       .from('lecturer_profiles')
       .select('id, name, email, password, class_group, created_at')
       .eq('email', normalised)
@@ -77,13 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (lecturerRow) {
       const hash = await hashPassword(password)
       if (lecturerRow.password !== hash) return 'Invalid email or password.'
+      // Clear any lingering admin session before setting lecturer session
+      await supabase.auth.signOut()
+      setUser(null)
       const profile = toLecturer(lecturerRow)
       setLecturerUser(profile)
       localStorage.setItem(LECTURER_SESSION_KEY, JSON.stringify(profile))
       return null
     }
 
-    // Fall through to admin (Supabase Auth)
+    // If the lecturer_profiles query errored (e.g. RLS), don't fall through to admin
+    if (lecturerErr) return 'Invalid email or password.'
+
+    // Fall through to admin (Supabase Auth) — clear any stale lecturer session first
+    localStorage.removeItem(LECTURER_SESSION_KEY)
+    setLecturerUser(null)
     const { error } = await supabase.auth.signInWithPassword({ email: normalised, password })
     return error ? 'Invalid email or password.' : null
   }, [])
@@ -91,13 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── logout ────────────────────────────────────────────────────────────────
 
   const logout = useCallback(async () => {
-    if (lecturerUser) {
-      setLecturerUser(null)
-      localStorage.removeItem(LECTURER_SESSION_KEY)
-    } else {
-      await supabase.auth.signOut()
-    }
-  }, [lecturerUser])
+    // Always clear both sessions on logout
+    setLecturerUser(null)
+    localStorage.removeItem(LECTURER_SESSION_KEY)
+    await supabase.auth.signOut()
+    setUser(null)
+  }, [])
 
   // ── admin: change password ────────────────────────────────────────────────
 
