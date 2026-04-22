@@ -134,6 +134,14 @@ export default function Dashboard() {
     }
   }
 
+  function isCompleted(dateStr: string, timeStr: string, duration: number): boolean {
+    try {
+      const dt = parseISO(`${dateStr}T${timeStr}`)
+      dt.setMinutes(dt.getMinutes() + duration)
+      return dt < new Date()
+    } catch { return false }
+  }
+
   function openReschedule(booking: Booking) {
     setRescheduleModal(booking)
     setRescheduleDate('')
@@ -372,24 +380,28 @@ export default function Dashboard() {
                             </>
                           )}
                           {booking.status === 'confirmed' && (
-                            <>
-                              {booking.date >= today && (
+                            isCompleted(booking.date, booking.time, booking.duration) ? (
+                              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md ml-1">Completed</span>
+                            ) : (
+                              <>
+                                {booking.date >= today && (
+                                  <button
+                                    onClick={() => openReschedule(booking)}
+                                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    title="Reschedule booking"
+                                  >
+                                    <CalendarDays className="w-4 h-4" />
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => openReschedule(booking)}
-                                  className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                  title="Reschedule booking"
+                                  onClick={() => cancelBooking(booking.id)}
+                                  className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  title="Cancel booking"
                                 >
-                                  <CalendarDays className="w-4 h-4" />
+                                  <X className="w-4 h-4" />
                                 </button>
-                              )}
-                              <button
-                                onClick={() => cancelBooking(booking.id)}
-                                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
-                                title="Cancel booking"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
+                              </>
+                            )
                           )}
                           {booking.status === 'cancelled' && (
                             <span className="text-xs font-medium text-red-400 bg-red-50 px-2.5 py-1 rounded-md ml-1">

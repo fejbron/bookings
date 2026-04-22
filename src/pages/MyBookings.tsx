@@ -37,6 +37,14 @@ export default function MyBookings() {
     } catch { return null }
   }
 
+  function isCompleted(dateStr: string, timeStr: string, duration: number): boolean {
+    try {
+      const dt = parseISO(`${dateStr}T${timeStr}`)
+      dt.setMinutes(dt.getMinutes() + duration)
+      return dt < new Date()
+    } catch { return false }
+  }
+
   const displayList = activeTab === 'upcoming' ? activeBookings : cancelledBookings
 
   return (
@@ -114,6 +122,7 @@ export default function MyBookings() {
               {displayList.map((booking, i) => {
                 const countdown = getCountdown(booking.date, booking.time)
                 const isCancelled = booking.status === 'cancelled'
+                const completed = booking.status === 'confirmed' && isCompleted(booking.date, booking.time, booking.duration)
 
                 return (
                   <div
@@ -123,7 +132,7 @@ export default function MyBookings() {
                   >
                     {/* Date block */}
                     <div className="text-center shrink-0 w-12">
-                      <div className={`text-xs font-semibold uppercase ${!isCancelled ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+                      <div className={`text-xs font-semibold uppercase ${isCancelled ? 'text-[var(--text-muted)]' : completed ? 'text-emerald-500' : 'text-[var(--accent)]'}`}>
                         {format(parseISO(booking.date), 'EEE')}
                       </div>
                       <div className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
@@ -157,7 +166,10 @@ export default function MyBookings() {
                       {booking.status === 'pending' && (
                         <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-xs text-amber-700 font-medium">Awaiting confirmation</span>
                       )}
-                      {countdown && booking.status !== 'pending' && (
+                      {completed && (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-emerald-100 text-xs text-emerald-700 font-medium">Completed</span>
+                      )}
+                      {countdown && booking.status !== 'pending' && !completed && (
                         <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
                           <Timer className="w-3 h-3" />
                           {countdown}
@@ -166,7 +178,7 @@ export default function MyBookings() {
                     </div>
 
                     {/* Cancel */}
-                    {!isCancelled && adminSettings.allowSelfCancel && (
+                    {!isCancelled && !completed && adminSettings.allowSelfCancel && (
                       cancelConfirmId === booking.id ? (
                         <div className="shrink-0 flex flex-col items-end gap-1 animate-scale-in">
                           <span className="text-xs text-red-500 font-medium">Cancel?</span>

@@ -247,6 +247,14 @@ export default function LecturerDashboard() {
     setDeleteConfirmSlot(null)
   }
 
+  function isCompleted(dateStr: string, timeStr: string, duration: number): boolean {
+    try {
+      const dt = parseISO(`${dateStr}T${timeStr}`)
+      dt.setMinutes(dt.getMinutes() + duration)
+      return dt < new Date()
+    } catch { return false }
+  }
+
   const bookingTabs: { key: BookingFilter; label: string }[] = [
     { key: 'upcoming', label: 'Upcoming' },
     { key: 'pending', label: `Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
@@ -381,7 +389,7 @@ export default function LecturerDashboard() {
                       {items.map((booking, i) => (
                         <div
                           key={booking.id}
-                          className={`bg-white rounded-xl border overflow-hidden hover:shadow-sm transition-shadow animate-fade-in-up ${booking.status === 'cancelled' ? 'opacity-50 border-[var(--border)]' : booking.status === 'pending' ? 'border-amber-200 bg-amber-50/30' : 'border-[var(--border)]'}`}
+                          className={`bg-white rounded-xl border overflow-hidden hover:shadow-sm transition-shadow animate-fade-in-up ${booking.status === 'cancelled' ? 'opacity-50 border-[var(--border)]' : booking.status === 'pending' ? 'border-amber-200 bg-amber-50/30' : isCompleted(booking.date, booking.time, booking.duration) ? 'border-emerald-100 bg-emerald-50/20' : 'border-[var(--border)]'}`}
                           style={{ animationDelay: `${Math.min(i * 30, 200)}ms` }}
                         >
                           <div className="p-4 sm:p-5 flex items-center gap-5">
@@ -438,24 +446,28 @@ export default function LecturerDashboard() {
                                 </>
                               )}
                               {booking.status === 'confirmed' && (
-                                <>
-                                  {booking.date >= today && (
+                                isCompleted(booking.date, booking.time, booking.duration) ? (
+                                  <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md ml-1">Completed</span>
+                                ) : (
+                                  <>
+                                    {booking.date >= today && (
+                                      <button
+                                        onClick={() => openReschedule(booking)}
+                                        className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                        title="Reschedule"
+                                      >
+                                        <CalendarDays className="w-4 h-4" />
+                                      </button>
+                                    )}
                                     <button
-                                      onClick={() => openReschedule(booking)}
-                                      className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                      title="Reschedule"
+                                      onClick={() => cancelBooking(booking.id)}
+                                      className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                      title="Cancel booking"
                                     >
-                                      <CalendarDays className="w-4 h-4" />
+                                      <X className="w-4 h-4" />
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => cancelBooking(booking.id)}
-                                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
-                                    title="Cancel booking"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </>
+                                  </>
+                                )
                               )}
                               {booking.status === 'cancelled' && (
                                 <span className="text-xs font-medium text-red-400 bg-red-50 px-2.5 py-1 rounded-md ml-1">Cancelled</span>
