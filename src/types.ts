@@ -22,6 +22,7 @@ export interface SlotConfig {
   startTime: string
   endTime: string
   duration: number
+  breakBetween: number
   excludeWeekends: boolean
   lecturerName?: string
   classGroup?: string

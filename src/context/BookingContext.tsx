@@ -22,7 +22,7 @@ interface BookingContextType {
   adminSettings: AdminSettings
   loading: boolean
 
-  generateSlots: (config: Omit<SlotConfig, 'id' | 'createdAt'>) => Promise<PresentationSlot[]>
+  generateSlots: (config: Omit<SlotConfig, 'id' | 'createdAt'> & { breakBetween?: number }) => Promise<PresentationSlot[]>
   removeSlot: (id: string) => Promise<void>
   clearAllSlots: () => Promise<void>
 
@@ -58,7 +58,7 @@ function toBooking(r: any): Booking {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toConfig(r: any): SlotConfig {
-  return { id: r.id, startDate: r.start_date, endDate: r.end_date, startTime: r.start_time, endTime: r.end_time, duration: r.duration, excludeWeekends: r.exclude_weekends, lecturerName: r.lecturer_name ?? undefined, classGroup: r.class_group ?? undefined, createdAt: r.created_at }
+  return { id: r.id, startDate: r.start_date, endDate: r.end_date, startTime: r.start_time, endTime: r.end_time, duration: r.duration, breakBetween: r.break_between ?? 0, excludeWeekends: r.exclude_weekends, lecturerName: r.lecturer_name ?? undefined, classGroup: r.class_group ?? undefined, createdAt: r.created_at }
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
@@ -91,12 +91,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').map(b => b.slotId))
 
-  const generateSlots = useCallback(async (config: Omit<SlotConfig, 'id' | 'createdAt'>): Promise<PresentationSlot[]> => {
+  const generateSlots = useCallback(async (config: Omit<SlotConfig, 'id' | 'createdAt'> & { breakBetween?: number }): Promise<PresentationSlot[]> => {
     const days = eachDayOfInterval({ start: parseISO(config.startDate), end: parseISO(config.endDate) })
     const [startH, startM] = config.startTime.split(':').map(Number)
     const [endH, endM] = config.endTime.split(':').map(Number)
     const startMinutes = startH * 60 + startM
     const endMinutes = endH * 60 + endM
+    const breakBetween = config.breakBetween ?? 0
+    const step = config.duration + breakBetween
 
     const rows: { id: string; date: string; time: string; duration: number; lecturer_name: string | null; class_group: string | null }[] = []
 
@@ -111,7 +113,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         if (!slots.some(s => s.date === dateStr && s.time === time)) {
           rows.push({ id: crypto.randomUUID(), date: dateStr, time, duration: config.duration, lecturer_name: config.lecturerName ?? null, class_group: config.classGroup ?? null })
         }
-        current += config.duration
+        current += step
       }
     }
 
@@ -127,6 +129,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       start_time: config.startTime,
       end_time: config.endTime,
       duration: config.duration,
+      break_between: breakBetween,
       exclude_weekends: config.excludeWeekends,
       lecturer_name: config.lecturerName ?? null,
       class_group: config.classGroup ?? null,

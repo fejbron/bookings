@@ -49,6 +49,7 @@ export default function LecturerDashboard() {
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
   const [duration, setDuration] = useState(15)
+  const [breakBetween, setBreakBetween] = useState(0)
   const [excludeWeekends, setExcludeWeekends] = useState(true)
   const [classGroup, setClassGroup] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -198,10 +199,11 @@ export default function LecturerDashboard() {
       const [sh, sm] = startTime.split(':').map(Number)
       const [eh, em] = endTime.split(':').map(Number)
       const totalMin = (eh * 60 + em) - (sh * 60 + sm)
-      const perDay = Math.floor(totalMin / duration)
-      return { days: filtered.length, perDay, total: filtered.length * perDay }
+      const step = duration + breakBetween
+      const perDay = Math.floor((totalMin - duration) / step) + 1
+      return { days: filtered.length, perDay: Math.max(0, perDay), total: filtered.length * Math.max(0, perDay) }
     } catch { return null }
-  }, [canGenerate, startDate, endDate, startTime, endTime, duration, excludeWeekends])
+  }, [canGenerate, startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends])
 
   const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed').map(b => b.slotId))
 
@@ -226,7 +228,7 @@ export default function LecturerDashboard() {
     setGenerateError('')
     try {
       const result = await generateSlots({
-        startDate, endDate, startTime, endTime, duration, excludeWeekends,
+        startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends,
         lecturerName,
         classGroup: classGroup.trim() || undefined,
       })
@@ -519,11 +521,17 @@ export default function LecturerDashboard() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4 mb-4">
+              <div className="grid sm:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Slot Duration</label>
                   <select value={duration} onChange={e => setDuration(Number(e.target.value))} className={fieldCls}>
                     {[5, 10, 15, 20, 30, 45, 60].map(v => <option key={v} value={v}>{v} minutes</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Break Between Slots</label>
+                  <select value={breakBetween} onChange={e => setBreakBetween(Number(e.target.value))} className={fieldCls}>
+                    {[0, 5, 10, 15, 20, 30].map(v => <option key={v} value={v}>{v === 0 ? 'No break' : `${v} minutes`}</option>)}
                   </select>
                 </div>
                 <div>
