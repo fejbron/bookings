@@ -123,7 +123,7 @@ export default function ManageSlots() {
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Break Between Slots</label>
               <select value={breakBetween} onChange={e => setBreakBetween(Number(e.target.value))} className={fieldCls}>
-                {[0, 5, 10, 15, 20, 30].map(v => <option key={v} value={v}>{v === 0 ? 'No break' : `${v} minutes`}</option>)}
+                {[0, 5, 10, 15, 20, 30, 60, 120].map(v => <option key={v} value={v}>{v === 0 ? 'No break' : v === 60 ? '1 hour' : v === 120 ? '2 hours' : `${v} minutes`}</option>)}
               </select>
             </div>
             <div className="flex items-end">
