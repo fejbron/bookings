@@ -3,8 +3,8 @@ import { useAuth } from '../context/AuthContext'
 import type { ReactNode } from 'react'
 
 export default function LecturerGuard({ children }: { children: ReactNode }) {
-  const { isLecturer, loading } = useAuth()
+  const { isLecturer, isSuperAdmin, loading } = useAuth()
   if (loading) return null
-  if (!isLecturer) return <Navigate to="/admin" replace />
+  if (!isLecturer && !isSuperAdmin) return <Navigate to="/admin" replace />
   return <>{children}</>
 }

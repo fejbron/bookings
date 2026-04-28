@@ -27,7 +27,9 @@ export default function Sidebar() {
   const { bookings, getLecturerBookings } = useBookings()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const links = isAdmin ? adminLinks : isLecturer ? lecturerLinks : studentLinks
+  const links = isSuperAdmin
+    ? [...adminLinks, { to: '/lecturer/dashboard', label: 'My Slots', icon: BookOpen }]
+    : isAdmin ? adminLinks : isLecturer ? lecturerLinks : studentLinks
   const isActive = (to: string) => pathname === to || (to !== '/' && pathname.startsWith(to))
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')

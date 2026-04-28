@@ -54,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { return null }
   })
 
+  const [superAdminLecturerProfile, setSuperAdminLecturerProfile] = useState<LecturerProfile | null>(null)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -64,6 +66,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Load the superadmin's lecturer profile so they can access lecturer features
+  useEffect(() => {
+    if (!user?.email || !SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+      setSuperAdminLecturerProfile(null)
+      return
+    }
+    supabase
+      .from('lecturer_profiles')
+      .select('id, name, email, class_group, created_at')
+      .eq('email', user.email.toLowerCase())
+      .maybeSingle()
+      .then(({ data }) => setSuperAdminLecturerProfile(data ? toLecturer(data) : null))
+  }, [user])
 
   // ── login: check lecturer table first, then Supabase Auth for admin ────────
 
@@ -163,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLecturer = !!lecturerUser
   const isAdmin = !!user && !isLecturer
   const isSuperAdmin = isAdmin && !!user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
-  const currentLecturer = lecturerUser
+  const currentLecturer = lecturerUser ?? (isSuperAdmin ? superAdminLecturerProfile : null)
 
   return (
     <AuthContext.Provider value={{
