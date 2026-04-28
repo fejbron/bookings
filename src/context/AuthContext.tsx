@@ -70,28 +70,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
     const normalised = email.toLowerCase().trim()
 
-    // Check lecturer_profiles first
-    const { data: lecturerRow, error: lecturerErr } = await supabase
-      .from('lecturer_profiles')
-      .select('id, name, email, password, class_group, created_at')
-      .eq('email', normalised)
-      .maybeSingle()
+    // Super admins skip the lecturer table and always authenticate via Supabase Auth
+    if (!SUPER_ADMIN_EMAILS.includes(normalised)) {
+      const { data: lecturerRow, error: lecturerErr } = await supabase
+        .from('lecturer_profiles')
+        .select('id, name, email, password, class_group, created_at')
+        .eq('email', normalised)
+        .maybeSingle()
 
-    if (lecturerRow) {
-      const hash = await hashPassword(password)
-      if (lecturerRow.password !== hash) return 'Invalid email or password.'
-      // Clear any lingering admin session before setting lecturer session
-      await supabase.auth.signOut()
-      setUser(null)
-      const profile = toLecturer(lecturerRow)
-      setLecturerUser(profile)
-      localStorage.setItem(LECTURER_SESSION_KEY, JSON.stringify(profile))
-      return null
+      if (lecturerRow) {
+        const hash = await hashPassword(password)
+        if (lecturerRow.password !== hash) return 'Invalid email or password.'
+        await supabase.auth.signOut()
+        setUser(null)
+        const profile = toLecturer(lecturerRow)
+        setLecturerUser(profile)
+        localStorage.setItem(LECTURER_SESSION_KEY, JSON.stringify(profile))
+        return null
+      }
+
+      if (lecturerErr) console.warn('lecturer_profiles query error:', lecturerErr.message)
     }
-
-    // lecturerRow is null — either not a lecturer or query failed (RLS)
-    // Either way, fall through to admin (Supabase Auth)
-    if (lecturerErr) console.warn('lecturer_profiles query error:', lecturerErr.message)
 
     // Fall through to admin (Supabase Auth) — clear any stale lecturer session first
     localStorage.removeItem(LECTURER_SESSION_KEY)
