@@ -16,12 +16,14 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 const LECTURER_SESSION_KEY = 'bookslot_lecturer_session'
+const SUPER_ADMIN_EMAILS = ['fejbroni@umat.edu.gh']
 
 // ── context types ────────────────────────────────────────────────────────────
 
 interface AuthContextType {
   user: User | null
   isAdmin: boolean
+  isSuperAdmin: boolean
   isLecturer: boolean
   currentLecturer: LecturerProfile | null
   lecturers: LecturerProfile[]
@@ -31,6 +33,7 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>
   createLecturerAccount: (name: string, email: string, password: string, classGroup: string) => Promise<void>
   deleteLecturerAccount: (id: string) => Promise<void>
+  resetLecturerPassword: (id: string, newPassword: string) => Promise<void>
   loadLecturers: () => Promise<void>
 }
 
@@ -152,15 +155,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLecturers(prev => prev.filter(l => l.id !== id))
   }, [])
 
+  const resetLecturerPassword = useCallback(async (id: string, newPassword: string) => {
+    const hash = await hashPassword(newPassword)
+    const { error } = await supabase.from('lecturer_profiles').update({ password: hash }).eq('id', id)
+    if (error) throw new Error(error.message)
+  }, [])
+
   const isLecturer = !!lecturerUser
   const isAdmin = !!user && !isLecturer
+  const isSuperAdmin = isAdmin && !!user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
   const currentLecturer = lecturerUser
 
   return (
     <AuthContext.Provider value={{
-      user, isAdmin, isLecturer, currentLecturer, lecturers, loading,
+      user, isAdmin, isSuperAdmin, isLecturer, currentLecturer, lecturers, loading,
       login, logout, changePassword,
-      createLecturerAccount, deleteLecturerAccount, loadLecturers,
+      createLecturerAccount, deleteLecturerAccount, resetLecturerPassword, loadLecturers,
     }}>
       {children}
     </AuthContext.Provider>

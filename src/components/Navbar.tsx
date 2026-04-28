@@ -23,7 +23,7 @@ const lecturerLinks = [
 
 export default function Sidebar() {
   const { pathname } = useLocation()
-  const { isAdmin, isLecturer, currentLecturer, logout } = useAuth()
+  const { isAdmin, isSuperAdmin, isLecturer, currentLecturer, logout } = useAuth()
   const { bookings, getLecturerBookings } = useBookings()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -45,7 +45,11 @@ export default function Sidebar() {
       >
         <CalendarDays className="w-7 h-7 text-[var(--accent)]" />
         <span className="text-lg font-bold text-[var(--text-primary)]">BookSlot</span>
-        {isAdmin && (
+        {isSuperAdmin ? (
+          <span className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md uppercase tracking-wider">
+            Super Admin
+          </span>
+        ) : isAdmin && (
           <span className="text-[10px] font-semibold bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-md uppercase tracking-wider">
             Admin
           </span>

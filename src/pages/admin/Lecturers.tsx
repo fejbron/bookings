@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Users, Plus, Trash2, Eye, EyeOff, AlertCircle, Check, X, User, Mail, Key, BookOpen } from 'lucide-react'
+import { Users, Plus, Trash2, Eye, EyeOff, AlertCircle, Check, X, User, Mail, Key, BookOpen, RotateCcw } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Lecturers() {
-  const { lecturers, loadLecturers, createLecturerAccount, deleteLecturerAccount } = useAuth()
+  const { lecturers, loadLecturers, createLecturerAccount, deleteLecturerAccount, resetLecturerPassword } = useAuth()
 
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -18,6 +18,11 @@ export default function Lecturers() {
   const [successMsg, setSuccessMsg] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [resetId, setResetId] = useState<string | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
     loadLecturers().catch(err => setLoadError(err instanceof Error ? err.message : 'Failed to load lecturers.'))
@@ -55,6 +60,33 @@ export default function Lecturers() {
   async function handleDelete(id: string) {
     await deleteLecturerAccount(id)
     setDeleteConfirmId(null)
+  }
+
+  function openReset(id: string) {
+    setResetId(id)
+    setResetPassword('')
+    setResetError('')
+    setShowResetPassword(false)
+    setDeleteConfirmId(null)
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!resetId) return
+    if (resetPassword.length < 6) return setResetError('Password must be at least 6 characters.')
+    setResetSubmitting(true)
+    setResetError('')
+    try {
+      await resetLecturerPassword(resetId, resetPassword)
+      setSuccessMsg('Password reset successfully.')
+      setTimeout(() => setSuccessMsg(''), 4000)
+      setResetId(null)
+      setResetPassword('')
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Failed to reset password.')
+    } finally {
+      setResetSubmitting(false)
+    }
   }
 
   const inputCls = "w-full px-3.5 py-2.5 rounded-lg border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition"
@@ -235,45 +267,102 @@ export default function Lecturers() {
             {lecturers.map((lecturer, i) => (
               <div
                 key={lecturer.id}
-                className="bg-white rounded-xl border border-[var(--border)] p-4 sm:p-5 flex items-center gap-4 animate-fade-in-up hover:shadow-sm transition-shadow"
+                className="bg-white rounded-xl border border-[var(--border)] animate-fade-in-up hover:shadow-sm transition-shadow overflow-hidden"
                 style={{ animationDelay: `${i * 40}ms` }}
               >
-                {/* Avatar */}
-                <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0">
-                  <span className="text-sm font-bold text-[var(--accent)]">
-                    {lecturer.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                  </span>
-                </div>
+                <div className="p-4 sm:p-5 flex items-center gap-4">
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-[var(--accent)]">
+                      {lecturer.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </span>
+                  </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{lecturer.name}</p>
-                  <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{lecturer.email}</p>
-                  {lecturer.classGroup && (
-                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{lecturer.classGroup}</span>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{lecturer.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{lecturer.email}</p>
+                    {lecturer.classGroup && (
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{lecturer.classGroup}</span>
+                    )}
+                  </div>
+
+                  {/* Date */}
+                  <p className="text-xs text-[var(--text-muted)] shrink-0 hidden sm:block">
+                    {lecturer.createdAt ? `Added ${format(parseISO(lecturer.createdAt), 'MMM d, yyyy')}` : ''}
+                  </p>
+
+                  {/* Actions */}
+                  {deleteConfirmId === lecturer.id ? (
+                    <div className="flex items-center gap-2 shrink-0 animate-scale-in">
+                      <span className="text-xs text-red-500 font-medium">Remove?</span>
+                      <button onClick={() => handleDelete(lecturer.id)} className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
+                      <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-0.5 rounded text-xs font-medium text-[var(--text-secondary)] hover:bg-gray-100 transition-colors">No</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => resetId === lecturer.id ? setResetId(null) : openReset(lecturer.id)}
+                        className="p-2 rounded-lg text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        title="Reset password"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => { setResetId(null); setDeleteConfirmId(lecturer.id) }}
+                        className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Remove lecturer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                {/* Date */}
-                <p className="text-xs text-[var(--text-muted)] shrink-0 hidden sm:block">
-                  {lecturer.createdAt ? `Added ${format(parseISO(lecturer.createdAt), 'MMM d, yyyy')}` : ''}
-                </p>
-
-                {/* Delete */}
-                {deleteConfirmId === lecturer.id ? (
-                  <div className="flex items-center gap-2 shrink-0 animate-scale-in">
-                    <span className="text-xs text-red-500 font-medium">Remove?</span>
-                    <button onClick={() => handleDelete(lecturer.id)} className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
-                    <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-0.5 rounded text-xs font-medium text-[var(--text-secondary)] hover:bg-gray-100 transition-colors">No</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirmId(lecturer.id)}
-                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
-                    title="Remove lecturer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                {/* Inline reset password form */}
+                {resetId === lecturer.id && (
+                  <form onSubmit={handleResetPassword} className="border-t border-[var(--border)] px-4 sm:px-5 py-4 bg-amber-50 animate-fade-in">
+                    <p className="text-xs font-medium text-amber-700 mb-3 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" /> Reset password for {lecturer.name}
+                    </p>
+                    <div className="flex gap-2 items-start">
+                      <div className="relative flex-1 max-w-xs">
+                        <input
+                          type={showResetPassword ? 'text' : 'password'}
+                          value={resetPassword}
+                          onChange={e => { setResetPassword(e.target.value); setResetError('') }}
+                          placeholder="New password (min. 6 chars)"
+                          autoFocus
+                          className="w-full px-3 py-2 pr-9 rounded-lg border border-amber-200 bg-white text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword(p => !p)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        >
+                          {showResetPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!resetPassword || resetSubmitting}
+                        className="flex items-center gap-1.5 bg-amber-600 text-white px-3.5 py-2 rounded-lg text-sm font-semibold hover:bg-amber-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                      >
+                        {resetSubmitting ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        {resetSubmitting ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResetId(null)}
+                        className="p-2 rounded-lg border border-amber-200 text-[var(--text-muted)] hover:bg-amber-100 transition-colors shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {resetError && (
+                      <p className="mt-2 text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{resetError}</p>
+                    )}
+                  </form>
                 )}
               </div>
             ))}
