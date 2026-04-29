@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Clock, Search, AlertCircle, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle, AlertTriangle, Plus, Trash2, Calendar, Info, UserPlus } from 'lucide-react'
+import { Clock, Search, AlertCircle, Filter, X, MapPin, MessageSquare, CalendarDays, CheckCircle, AlertTriangle, Plus, Trash2, Calendar, Info, UserPlus, ChevronDown, ChevronUp } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
@@ -57,6 +57,7 @@ export default function LecturerDashboard() {
   const [generateError, setGenerateError] = useState('')
   const [showPast, setShowPast] = useState(false)
   const [deleteConfirmSlot, setDeleteConfirmSlot] = useState<string | null>(null)
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const today = format(new Date(), 'yyyy-MM-dd')
   const lecturerName = currentLecturer?.name ?? ''
@@ -96,15 +97,34 @@ export default function LecturerDashboard() {
     return list.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
   }, [myBookings, filter, search, dateFrom, dateTo, today])
 
+  const activeFiltered = useMemo(
+    () => filtered.filter(b => !isCompleted(b.date, b.time, b.duration)),
+    [filtered]
+  )
+  const completedFiltered = useMemo(
+    () => filtered.filter(b => isCompleted(b.date, b.time, b.duration)),
+    [filtered]
+  )
+
   const grouped = useMemo(() => {
-    const groups: Record<string, typeof filtered> = {}
-    for (const booking of filtered) {
+    const groups: Record<string, typeof activeFiltered> = {}
+    for (const booking of activeFiltered) {
       const key = format(parseISO(booking.date), 'MMMM yyyy')
       if (!groups[key]) groups[key] = []
       groups[key].push(booking)
     }
     return groups
-  }, [filtered])
+  }, [activeFiltered])
+
+  const groupedCompleted = useMemo(() => {
+    const groups: Record<string, typeof completedFiltered> = {}
+    for (const booking of completedFiltered) {
+      const key = format(parseISO(booking.date), 'MMMM yyyy')
+      if (!groups[key]) groups[key] = []
+      groups[key].push(booking)
+    }
+    return groups
+  }, [completedFiltered])
 
   const availableSlotsForReschedule = useMemo(() => {
     if (!rescheduleDate || !rescheduleModal) return []
@@ -384,6 +404,11 @@ export default function LecturerDashboard() {
               </div>
             ) : (
               <div className="space-y-8">
+                {activeFiltered.length === 0 && completedFiltered.length > 0 && (
+                  <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center">
+                    <p className="text-sm text-[var(--text-muted)]">No active bookings. {completedFiltered.length} completed below.</p>
+                  </div>
+                )}
                 {Object.entries(grouped).map(([month, items]) => (
                   <div key={month}>
                     <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{month}</h3>
@@ -488,6 +513,86 @@ export default function LecturerDashboard() {
                     </div>
                   </div>
                 ))}
+
+                {/* Completed bookings — collapsed by default */}
+                {completedFiltered.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowCompleted(p => !p)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-gray-300 hover:bg-gray-50 transition-colors mb-3"
+                    >
+                      <span className="flex items-center gap-2">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                        {completedFiltered.length} completed booking{completedFiltered.length !== 1 ? 's' : ''}
+                      </span>
+                      {showCompleted ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                    {showCompleted && (
+                      <div className="space-y-8">
+                        {Object.entries(groupedCompleted).map(([month, items]) => (
+                          <div key={month}>
+                            <h3 className="text-sm font-semibold text-[var(--text-muted)] mb-3">{month}</h3>
+                            <div className="space-y-3">
+                              {items.map((booking, i) => (
+                                <div
+                                  key={booking.id}
+                                  className="bg-white rounded-xl border border-emerald-100 bg-emerald-50/20 overflow-hidden opacity-70 hover:opacity-100 transition-opacity animate-fade-in-up"
+                                  style={{ animationDelay: `${Math.min(i * 30, 200)}ms` }}
+                                >
+                                  <div className="p-4 sm:p-5 flex items-center gap-5">
+                                    <div className="text-center shrink-0 w-14">
+                                      <div className="text-xs font-semibold uppercase text-[var(--text-muted)]">
+                                        {format(parseISO(booking.date), 'EEE')}
+                                      </div>
+                                      <div className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+                                        {format(parseISO(booking.date), 'dd')}
+                                      </div>
+                                    </div>
+                                    <div className="w-px h-10 bg-[var(--border)]" />
+                                    <div className="shrink-0 space-y-1">
+                                      <div className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
+                                        <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                        <span className="font-medium">{formatTime(booking.time)}</span>
+                                        <span className="text-[var(--text-muted)]">· {booking.duration}min</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                                        <MapPin className="w-3 h-3" /> Presentation
+                                      </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
+                                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
+                                      {booking.bookingPurpose && (
+                                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
+                                      )}
+                                    </div>
+                                    <div className="shrink-0 flex items-center gap-1">
+                                      <button
+                                        onClick={() => openComment(booking)}
+                                        className={`p-2 rounded-lg transition-colors ${booking.adminComment ? 'text-[var(--accent)] bg-blue-50 hover:bg-blue-100' : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-blue-50'}`}
+                                        title={booking.adminComment ? 'Edit note' : 'Add note'}
+                                      >
+                                        <MessageSquare className="w-4 h-4" />
+                                      </button>
+                                      <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md ml-1">Completed</span>
+                                    </div>
+                                  </div>
+                                  {booking.adminComment && (
+                                    <div className="px-5 pb-3 pt-0 border-t border-[var(--border)] bg-gray-50/60">
+                                      <p className="text-xs text-[var(--text-secondary)] mt-2.5">
+                                        <span className="font-medium text-[var(--text-muted)]">Note: </span>{booking.adminComment}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
