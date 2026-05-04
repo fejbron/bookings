@@ -38,7 +38,6 @@ export default function LecturerDashboard() {
   const [addStudentName, setAddStudentName] = useState('')
   const [addStudentEmail, setAddStudentEmail] = useState('')
   const [addTopic, setAddTopic] = useState('')
-  const [addPurpose, setAddPurpose] = useState('')
   const [addNotes, setAddNotes] = useState('')
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
@@ -182,7 +181,6 @@ export default function LecturerDashboard() {
     setAddStudentName('')
     setAddStudentEmail('')
     setAddTopic('')
-    setAddPurpose(adminSettings.bookingPurposes[0] ?? '')
     setAddNotes('')
     setAddError('')
   }
@@ -198,7 +196,6 @@ export default function LecturerDashboard() {
         studentEmail: addStudentEmail.trim(),
         presentationTopic: addTopic.trim(),
         notes: addNotes.trim(),
-        bookingPurpose: addPurpose,
       }, 'confirmed')
       setAddBookingOpen(false)
     } catch (err) {
@@ -443,9 +440,6 @@ export default function LecturerDashboard() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
                               <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
-                              {booking.bookingPurpose && (
-                                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
-                              )}
                             </div>
                             <div className="shrink-0 flex items-center gap-1">
                               <button
@@ -563,9 +557,6 @@ export default function LecturerDashboard() {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
                                       <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
-                                      {booking.bookingPurpose && (
-                                        <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
-                                      )}
                                     </div>
                                     <div className="shrink-0 flex items-center gap-1">
                                       <button
@@ -933,15 +924,6 @@ export default function LecturerDashboard() {
                   placeholder="Topic title" required maxLength={200}
                   className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
               </div>
-              {adminSettings.bookingPurposes.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Purpose</label>
-                  <select value={addPurpose} onChange={e => setAddPurpose(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white">
-                    {adminSettings.bookingPurposes.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-              )}
               <div>
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Notes <span className="text-[var(--text-muted)] font-normal">(optional)</span></label>
                 <textarea value={addNotes} onChange={e => setAddNotes(e.target.value)}

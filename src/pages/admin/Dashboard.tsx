@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Search, AlertCircle, Download, Filter, X, MessageSquare, CalendarDays, CheckCircle, Plus, User, Mail, Presentation, FileText, Tag, LayoutList } from 'lucide-react'
+import { Search, AlertCircle, Download, Filter, X, MessageSquare, CalendarDays, CheckCircle, Plus, User, Mail, Presentation, FileText, LayoutList } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 import CalendarView from '../../components/CalendarView'
@@ -19,7 +19,7 @@ const COLOR_BADGE: Record<string, string> = {
 type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function Dashboard() {
-  const { bookings, slots, calendarTypeRecords, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+  const { bookings, slots, calendarTypeRecords, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot } = useBookings()
   const [pageView, setPageView] = useState<'list' | 'calendar'>('list')
 
   function calTypeBadgeClass(typeName: string) {
@@ -61,7 +61,6 @@ export default function Dashboard() {
   const [nbName, setNbName] = useState('')
   const [nbEmail, setNbEmail] = useState('')
   const [nbTopic, setNbTopic] = useState('')
-  const [nbPurpose, setNbPurpose] = useState('')
   const [nbNotes, setNbNotes] = useState('')
   const [nbErrors, setNbErrors] = useState<Record<string, string>>({})
   const [nbLoading, setNbLoading] = useState(false)
@@ -120,7 +119,7 @@ export default function Dashboard() {
   function openNewBooking() {
     setNewBookingOpen(true)
     setNbDate(''); setNbSlotId(''); setNbName(''); setNbEmail('')
-    setNbTopic(''); setNbPurpose(''); setNbNotes('')
+    setNbTopic(''); setNbNotes('')
     setNbErrors({}); setNbError('')
   }
 
@@ -132,7 +131,6 @@ export default function Dashboard() {
     if (!nbEmail.trim()) errs.email = 'Email is required.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nbEmail.trim())) errs.email = 'Enter a valid email.'
     if (!nbTopic.trim()) errs.topic = 'Presentation topic is required.'
-    if (adminSettings.bookingPurposes.length > 0 && !nbPurpose) errs.purpose = 'Select a purpose.'
     setNbErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -147,7 +145,6 @@ export default function Dashboard() {
         studentEmail: nbEmail.trim(),
         presentationTopic: nbTopic.trim(),
         notes: nbNotes.trim(),
-        bookingPurpose: nbPurpose,
       })
       setNewBookingOpen(false)
     } catch (err) {
@@ -579,7 +576,6 @@ export default function Dashboard() {
                         { label: 'DATE', value: format(parseISO(selectedBooking.date), 'EEE, dd MMM yyyy') },
                         { label: 'TIME', value: formatTime(selectedBooking.time) },
                         { label: 'DURATION', value: `${selectedBooking.duration} min` },
-                        { label: 'PURPOSE', value: selectedBooking.bookingPurpose || '—' },
                       ].map(({ label, value }) => (
                         <div key={label} className="bg-gray-50 rounded-lg p-2.5">
                           <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{label}</p>
@@ -717,32 +713,6 @@ export default function Dashboard() {
                     </div>
                   )}
                   {nbErrors.slot && <p className="mt-1 text-xs text-red-500">{nbErrors.slot}</p>}
-                </div>
-              )}
-
-              {/* Purpose chips */}
-              {adminSettings.bookingPurposes.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 flex items-center gap-1">
-                    <Tag className="w-3 h-3" /> Purpose
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {adminSettings.bookingPurposes.map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => { setNbPurpose(p); setNbErrors(prev => ({ ...prev, purpose: '' })) }}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          nbPurpose === p
-                            ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
-                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  {nbErrors.purpose && <p className="mt-1 text-xs text-red-500">{nbErrors.purpose}</p>}
                 </div>
               )}
 

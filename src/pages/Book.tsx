@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
   ArrowLeft, CalendarDays, Check, Clock, FileText,
-  Mail, Presentation, User, AlertCircle, Tag, ChevronRight,
+  Mail, Presentation, User, AlertCircle, ChevronRight,
   Briefcase, Smile, MoreHorizontal,
 } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
@@ -52,7 +52,6 @@ export default function Book() {
   const [email, setEmail] = useState('')
   const [presentationTopic, setPresentationTopic] = useState('')
   const [notes, setNotes] = useState('')
-  const [bookingPurpose, setBookingPurpose] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [bookingError, setBookingError] = useState('')
@@ -96,7 +95,6 @@ export default function Book() {
 
   function validateForm(): boolean {
     const e: Record<string, string> = {}
-    if (adminSettings.bookingPurposes.length > 0 && !bookingPurpose) e.purpose = 'Please select a purpose.'
     if (!name.trim()) e.name = 'Full name is required.'
     if (!email.trim()) e.email = 'Email is required.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = 'Enter a valid email.'
@@ -115,7 +113,6 @@ export default function Book() {
         studentEmail: email.trim(),
         presentationTopic: presentationTopic.trim(),
         notes: notes.trim(),
-        bookingPurpose,
       })
       setSubmitted(true)
     } catch (err) {
@@ -129,7 +126,7 @@ export default function Book() {
     setView(calendarTypes.length > 1 ? 'type' : 'select')
     setCalendarType(calendarTypes.length <= 1 ? (calendarTypes[0] ?? null) : null)
     setDate(null); setSlotId(null)
-    setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setBookingPurpose('')
+    setName(''); setEmail(''); setPresentationTopic(''); setNotes('')
     setErrors({}); setBookingError(''); setSubmitted(false)
   }
 
@@ -327,8 +324,7 @@ export default function Book() {
   }
 
   // ── VIEW: confirm (2-column) ────────────────────────────────────────────────
-  const canSubmit = !!name.trim() && !!email.trim() && !!presentationTopic.trim() &&
-    (adminSettings.bookingPurposes.length === 0 || !!bookingPurpose)
+  const canSubmit = !!name.trim() && !!email.trim() && !!presentationTopic.trim()
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] flex items-start justify-center p-4 sm:p-8 py-8 sm:py-12">
@@ -381,32 +377,6 @@ export default function Book() {
           <h2 className="text-base font-semibold text-[var(--text-primary)] mb-6">Your Information</h2>
 
           <div className="space-y-4">
-            {/* Purpose chips */}
-            {adminSettings.bookingPurposes.length > 0 && (
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5" /> Purpose
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {adminSettings.bookingPurposes.map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => { setBookingPurpose(p); setErrors(prev => ({ ...prev, purpose: '' })) }}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
-                        bookingPurpose === p
-                          ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
-                          : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-                {errors.purpose && <p className="mt-1.5 text-xs text-red-500">{errors.purpose}</p>}
-              </div>
-            )}
-
             {/* Text fields */}
             {[
               { icon: User, label: 'Full Name', key: 'name', type: 'text', val: name, set: setName, placeholder: 'John Doe', err: errors.name },

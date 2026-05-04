@@ -6,13 +6,11 @@ import { supabase } from '../lib/supabase'
 export interface AdminSettings {
   welcomeMessage: string
   allowSelfCancel: boolean
-  bookingPurposes: string[]
 }
 
 const DEFAULT_SETTINGS: AdminSettings = {
   welcomeMessage: '',
   allowSelfCancel: true,
-  bookingPurposes: ['Final Year Project', 'Module Assessment', 'Practice Presentation', 'Research', 'Other'],
 }
 
 interface BookingContextType {
@@ -33,7 +31,7 @@ interface BookingContextType {
   getCalendarTypes: () => string[]
   getAvailableDates: (calendarType?: string) => string[]
   getAvailableSlots: (date: string, calendarType?: string) => PresentationSlot[]
-  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }, initialStatus?: 'pending' | 'confirmed') => Promise<Booking>
+  bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }, initialStatus?: 'pending' | 'confirmed') => Promise<Booking>
   confirmBooking: (id: string) => Promise<void>
   getStudentBookings: (email: string) => Booking[]
   cancelBooking: (id: string) => Promise<void>
@@ -58,7 +56,7 @@ function toSlot(r: any): PresentationSlot {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, bookingPurpose: r.booking_purpose ?? '', adminComment: r.admin_comment ?? '', createdAt: r.created_at }
+  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', createdAt: r.created_at }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,9 +91,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       if (configsRes.data) setSlotConfigs(configsRes.data.map(toConfig))
       if (calTypesRes.data) setCalendarTypeRecords(calTypesRes.data.map(toCalendarType))
       if (settingsRes.data) {
-        let purposes = DEFAULT_SETTINGS.bookingPurposes
-        try { if (settingsRes.data.booking_purposes) purposes = JSON.parse(settingsRes.data.booking_purposes) } catch { /* use defaults */ }
-        setAdminSettings({ welcomeMessage: settingsRes.data.welcome_message, allowSelfCancel: settingsRes.data.allow_self_cancel, bookingPurposes: purposes })
+        setAdminSettings({ welcomeMessage: settingsRes.data.welcome_message, allowSelfCancel: settingsRes.data.allow_self_cancel })
       }
       setLoading(false)
     }
@@ -212,7 +208,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => a.time.localeCompare(b.time))
   }, [slots, bookedSlotIds])
 
-  const bookSlot = useCallback(async (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string; bookingPurpose: string }, initialStatus: 'pending' | 'confirmed' = 'pending'): Promise<Booking> => {
+  const bookSlot = useCallback(async (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }, initialStatus: 'pending' | 'confirmed' = 'pending'): Promise<Booking> => {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) throw new Error('Slot not found')
 
@@ -243,7 +239,6 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       student_email: data.studentEmail.toLowerCase(),
       presentation_topic: data.presentationTopic,
       notes: data.notes,
-      booking_purpose: data.bookingPurpose,
       status: initialStatus,
     }).select().single()
     if (error) throw new Error(error.message)
@@ -318,8 +313,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const exportBookingsCSV = useCallback(() => {
     const confirmed = bookings.filter(b => b.status === 'confirmed')
     if (confirmed.length === 0) return
-    const headers = ['Student Name', 'Email', 'Presentation Topic', 'Purpose', 'Date', 'Time', 'Duration (min)', 'Notes', 'Admin Comment', 'Booked At']
-    const rows = confirmed.map(b => [b.studentName, b.studentEmail, b.presentationTopic, b.bookingPurpose ?? '', b.date, b.time, b.duration.toString(), b.notes.replace(/,/g, ';'), (b.adminComment ?? '').replace(/,/g, ';'), b.createdAt])
+    const headers = ['Student Name', 'Email', 'Presentation Topic', 'Date', 'Time', 'Duration (min)', 'Notes', 'Admin Comment', 'Booked At']
+    const rows = confirmed.map(b => [b.studentName, b.studentEmail, b.presentationTopic, b.date, b.time, b.duration.toString(), b.notes.replace(/,/g, ';'), (b.adminComment ?? '').replace(/,/g, ';'), b.createdAt])
     const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -332,7 +327,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const updateAdminSettings = useCallback(async (updates: Partial<AdminSettings>) => {
     const newSettings = { ...adminSettings, ...updates }
-    await supabase.from('admin_settings').upsert({ id: 1, welcome_message: newSettings.welcomeMessage, allow_self_cancel: newSettings.allowSelfCancel, booking_purposes: JSON.stringify(newSettings.bookingPurposes) })
+    await supabase.from('admin_settings').upsert({ id: 1, welcome_message: newSettings.welcomeMessage, allow_self_cancel: newSettings.allowSelfCancel })
     setAdminSettings(newSettings)
   }, [adminSettings])
 

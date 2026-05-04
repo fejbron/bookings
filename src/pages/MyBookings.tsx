@@ -160,21 +160,32 @@ export default function MyBookings() {
                       <p className={`text-sm font-medium truncate ${isCancelled ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
                         {booking.presentationTopic}
                       </p>
-                      {booking.bookingPurpose && (
-                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{booking.bookingPurpose}</span>
-                      )}
-                      {booking.status === 'pending' && (
-                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-xs text-amber-700 font-medium">Awaiting confirmation</span>
-                      )}
-                      {completed && (
-                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-emerald-100 text-xs text-emerald-700 font-medium">Completed</span>
-                      )}
-                      {countdown && booking.status !== 'pending' && !completed && (
-                        <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
-                          <Timer className="w-3 h-3" />
-                          {countdown}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {booking.status === 'pending' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-xs text-amber-700 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                            Awaiting confirmation
+                          </span>
+                        )}
+                        {booking.status === 'confirmed' && !completed && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-xs text-emerald-700 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            Confirmed
+                          </span>
+                        )}
+                        {completed && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-500 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                            Completed
+                          </span>
+                        )}
+                        {countdown && booking.status === 'confirmed' && !completed && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                            <Timer className="w-3 h-3" />
+                            {countdown}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Cancel */}
