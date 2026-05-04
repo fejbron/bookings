@@ -4,19 +4,48 @@ import { format } from 'date-fns'
 import {
   ArrowLeft, CalendarDays, Check, Clock, FileText,
   Mail, Presentation, User, AlertCircle, Tag, ChevronRight,
+  Briefcase, Smile, MoreHorizontal,
 } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
 import type { PresentationSlot } from '../types'
 
-type View = 'select' | 'confirm'
+type View = 'type' | 'select' | 'confirm'
+
+// Icons matched by calendar type name
+const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'Presentation':   Presentation,
+  'Office Meeting': Briefcase,
+  'Personal':       Smile,
+  'Other':          MoreHorizontal,
+}
+
+// Color classes mapped from DB color string
+const COLOR_META: Record<string, { color: string; bg: string; border: string }> = {
+  blue:   { color: 'text-[var(--accent)]',  bg: 'bg-[var(--accent-light)]', border: 'border-[var(--accent)]' },
+  purple: { color: 'text-purple-600',       bg: 'bg-purple-50',             border: 'border-purple-400' },
+  green:  { color: 'text-emerald-600',      bg: 'bg-emerald-50',            border: 'border-emerald-400' },
+  grey:   { color: 'text-gray-500',         bg: 'bg-gray-50',               border: 'border-gray-300' },
+  orange: { color: 'text-orange-600',       bg: 'bg-orange-50',             border: 'border-orange-400' },
+  pink:   { color: 'text-pink-600',         bg: 'bg-pink-50',               border: 'border-pink-400' },
+  teal:   { color: 'text-teal-600',         bg: 'bg-teal-50',               border: 'border-teal-400' },
+}
+const DEFAULT_META = { icon: CalendarDays, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-300' }
 
 export default function Book() {
   const navigate = useNavigate()
-  const { getAvailableDates, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+  const { getAvailableDates, getAvailableSlots, bookSlot, adminSettings, getCalendarTypes, calendarTypeRecords } = useBookings()
 
-  const [view, setView] = useState<View>('select')
+  function getTypeMeta(typeName: string | null) {
+    const record = calendarTypeRecords.find(t => t.name === typeName)
+    const cm = COLOR_META[record?.color ?? ''] ?? { color: DEFAULT_META.color, bg: DEFAULT_META.bg, border: DEFAULT_META.border }
+    const icon = (typeName && TYPE_ICONS[typeName]) ? TYPE_ICONS[typeName] : DEFAULT_META.icon
+    return { icon, ...cm }
+  }
+
+  const [view, setView] = useState<View>('type')
+  const [calendarType, setCalendarType] = useState<string | null>(null)
   const [date, setDate] = useState<Date | null>(null)
   const [slotId, setSlotId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -29,15 +58,36 @@ export default function Book() {
   const [bookingError, setBookingError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const availableDates = useMemo(() => getAvailableDates(), [getAvailableDates])
+  const calendarTypes = useMemo(() => getCalendarTypes(), [getCalendarTypes])
+  const availableDates = useMemo(
+    () => getAvailableDates(calendarType ?? undefined),
+    [getAvailableDates, calendarType],
+  )
   const slotsForDate = useMemo(
-    () => (date ? getAvailableSlots(format(date, 'yyyy-MM-dd')) : []),
-    [date, getAvailableSlots],
+    () => (date ? getAvailableSlots(format(date, 'yyyy-MM-dd'), calendarType ?? undefined) : []),
+    [date, getAvailableSlots, calendarType],
   )
   const selectedSlot: PresentationSlot | null = useMemo(
     () => slotsForDate.find(s => s.id === slotId) ?? null,
     [slotsForDate, slotId],
   )
+
+  // Skip type-selection if only one calendar type (or none)
+  useMemo(() => {
+    if (calendarTypes.length <= 1) {
+      setCalendarType(calendarTypes[0] ?? null)
+      setView('select')
+    }
+  // Only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function handleSelectType(type: string) {
+    setCalendarType(type)
+    setDate(null)
+    setSlotId(null)
+    setView('select')
+  }
 
   function handleDateSelect(d: Date) {
     setDate(d)
@@ -76,7 +126,9 @@ export default function Book() {
   }
 
   function resetAll() {
-    setView('select'); setDate(null); setSlotId(null)
+    setView(calendarTypes.length > 1 ? 'type' : 'select')
+    setCalendarType(calendarTypes.length <= 1 ? (calendarTypes[0] ?? null) : null)
+    setDate(null); setSlotId(null)
     setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setBookingPurpose('')
     setErrors({}); setBookingError(''); setSubmitted(false)
   }
@@ -91,7 +143,7 @@ export default function Book() {
           </div>
           <h2 className="text-xl font-bold text-[var(--text-primary)]">You're booked!</h2>
           <p className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">
-            Your presentation on{' '}
+            Your{calendarType ? ` ${calendarType.toLowerCase()}` : ''} on{' '}
             <span className="font-semibold text-[var(--text-primary)]">{date && format(date, 'EEEE, MMMM d')}</span>{' '}
             at{' '}
             <span className="font-semibold text-[var(--text-primary)]">{selectedSlot && formatTime(selectedSlot.time)}</span>{' '}
@@ -116,15 +168,73 @@ export default function Book() {
     )
   }
 
+  // ── VIEW: type selection ────────────────────────────────────────────────────
+  if (view === 'type') {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-start justify-center p-4 sm:p-8 py-8 sm:py-14">
+        <div className="w-full max-w-xl animate-fade-in-up">
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">What would you like to book?</h1>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Choose a calendar type to see available slots.</p>
+          </div>
+
+          {calendarTypes.length === 0 ? (
+            <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 px-5 py-4 rounded-xl">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              No slots have been set up yet. Check back later or contact your admin.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {calendarTypes.map(type => {
+                const meta = getTypeMeta(type)
+                const Icon = meta.icon
+                const count = getAvailableDates(type).length
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleSelectType(type)}
+                    className={`group flex flex-col items-start gap-3 p-5 bg-white rounded-2xl border-2 hover:shadow-md transition-all text-left ${meta.border}`}
+                    style={{ boxShadow: 'var(--card-shadow)' }}
+                  >
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${meta.bg}`}>
+                      <Icon className={`w-5 h-5 ${meta.color}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[var(--text-primary)]">{type}</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">{count} date{count !== 1 ? 's' : ''} available</p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 mt-auto self-end opacity-0 group-hover:opacity-100 transition-opacity ${meta.color}`} />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // ── Shared left info panel ──────────────────────────────────────────────────
+  const activeMeta = getTypeMeta(calendarType)
+  const ActiveIcon = activeMeta.icon
+
   const InfoPanel = (
     <div className="flex flex-col gap-5 p-6 md:p-8">
+      {calendarTypes.length > 1 && (
+        <button
+          onClick={() => setView('type')}
+          className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs font-medium transition-colors w-fit"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          All calendars
+        </button>
+      )}
       <div>
-        <div className="w-10 h-10 rounded-xl bg-[var(--accent-light)] flex items-center justify-center mb-4">
-          <Presentation className="w-5 h-5 text-[var(--accent)]" />
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${activeMeta.bg}`}>
+          <ActiveIcon className={`w-5 h-5 ${activeMeta.color}`} />
         </div>
         <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
-          Presentation Booking
+          {calendarType ?? 'Booking'}
         </p>
         <h1 className="text-lg font-bold text-[var(--text-primary)] leading-snug">
           {adminSettings.welcomeMessage || 'Book a Slot'}
@@ -193,7 +303,7 @@ export default function Book() {
                 <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{format(date, 'EEEE')}</h2>
                 <p className="text-xs text-[var(--text-muted)] mb-5">{format(date, 'MMMM d, yyyy')}</p>
 
-                <div className="flex-1 overflow-y-auto max-h-80 space-y-0 pr-0.5">
+                <div className="flex-1 overflow-y-auto max-h-80 pr-0.5">
                   <TimeSlots slots={slotsForDate} selected={slotId} onSelect={setSlotId} />
                 </div>
 
@@ -237,11 +347,11 @@ export default function Book() {
               Back
             </button>
 
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-light)] flex items-center justify-center mb-4">
-              <Presentation className="w-5 h-5 text-[var(--accent)]" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${activeMeta.bg}`}>
+              <ActiveIcon className={`w-5 h-5 ${activeMeta.color}`} />
             </div>
             <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
-              Presentation Booking
+              {calendarType ?? 'Booking'}
             </p>
             <h1 className="text-base font-bold text-[var(--text-primary)] mb-5">
               {adminSettings.welcomeMessage || 'Book a Slot'}

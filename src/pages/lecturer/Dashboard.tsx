@@ -249,6 +249,7 @@ export default function LecturerDashboard() {
     try {
       const result = await generateSlots({
         startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends,
+        calendarType: 'Presentation',
         lecturerName,
         classGroup: classGroup.trim() || undefined,
       })

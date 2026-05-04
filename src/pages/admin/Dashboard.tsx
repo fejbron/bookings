@@ -5,14 +5,40 @@ import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
 import type { Booking } from '../../types'
 
+const COLOR_BADGE: Record<string, string> = {
+  blue:   'bg-[var(--accent-light)] text-[var(--accent)]',
+  purple: 'bg-purple-50 text-purple-700',
+  green:  'bg-emerald-50 text-emerald-700',
+  grey:   'bg-gray-100 text-gray-600',
+  orange: 'bg-orange-50 text-orange-700',
+  pink:   'bg-pink-50 text-pink-700',
+  teal:   'bg-teal-50 text-teal-700',
+}
+
 type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function Dashboard() {
-  const { bookings, slots, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+  const { bookings, slots, calendarTypeRecords, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+
+  function calTypeBadgeClass(typeName: string) {
+    const record = calendarTypeRecords.find(t => t.name === typeName)
+    return COLOR_BADGE[record?.color ?? ''] ?? 'bg-gray-100 text-gray-600'
+  }
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState('')
+
+  // All unique calendar types across all bookings (via their slots)
+  const allCalendarTypes = useMemo(() => {
+    const types = new Set<string>()
+    for (const b of bookings) {
+      const slot = slots.find(s => s.id === b.slotId)
+      if (slot?.calendarType) types.add(slot.calendarType)
+    }
+    return Array.from(types).sort()
+  }, [bookings, slots])
 
   // Reschedule modal state
   const [rescheduleModal, setRescheduleModal] = useState<Booking | null>(null)
@@ -60,6 +86,12 @@ export default function Dashboard() {
         list = list.filter((b) => b.status === filter)
         break
     }
+    if (calendarTypeFilter) {
+      list = list.filter(b => {
+        const slot = slots.find(s => s.id === b.slotId)
+        return slot?.calendarType === calendarTypeFilter
+      })
+    }
     if (dateFrom) list = list.filter(b => b.date >= dateFrom)
     if (dateTo) list = list.filter(b => b.date <= dateTo)
     if (search.trim()) {
@@ -71,7 +103,7 @@ export default function Dashboard() {
       )
     }
     return list.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
-  }, [bookings, filter, search, dateFrom, dateTo, today])
+  }, [bookings, slots, filter, calendarTypeFilter, search, dateFrom, dateTo, today])
 
   const availableSlotsForReschedule = useMemo(() => {
     if (!rescheduleDate || !rescheduleModal) return []
@@ -266,7 +298,7 @@ export default function Dashboard() {
               {tabs.map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => { setFilter(tab.key); setExpandedPastMonths(new Set()) }}
+                  onClick={() => { setFilter(tab.key); setExpandedPastMonths(new Set()); setCalendarTypeFilter('') }}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     filter === tab.key
                       ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
@@ -313,6 +345,31 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* Calendar type filter — shown only when multiple types exist */}
+            {allCalendarTypes.length > 1 && (
+              <div className="flex items-center gap-2 mb-5 flex-wrap">
+                <button
+                  onClick={() => setCalendarTypeFilter('')}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${!calendarTypeFilter ? 'bg-[var(--text-primary)] border-[var(--text-primary)] text-white' : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+                >
+                  All types
+                </button>
+                {allCalendarTypes.map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setCalendarTypeFilter(calendarTypeFilter === type ? '' : type)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                      calendarTypeFilter === type
+                        ? 'bg-[var(--text-primary)] border-[var(--text-primary)] text-white'
+                        : `${calTypeBadgeClass(type)} border-transparent hover:border-gray-200`
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Bookings List */}
             {(() => {
@@ -481,20 +538,34 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Date / Time / Duration chips */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'DATE', value: format(parseISO(selectedBooking.date), 'EEE, dd MMM yyyy') },
-                    { label: 'TIME', value: formatTime(selectedBooking.time) },
-                    { label: 'DURATION', value: `${selectedBooking.duration} min` },
-                    { label: 'PURPOSE', value: selectedBooking.bookingPurpose || '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-gray-50 rounded-lg p-2.5">
-                      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{label}</p>
-                      <p className="text-xs font-semibold text-[var(--text-primary)] mt-0.5 leading-tight">{value}</p>
+                {/* Date / Time / Duration / Calendar chips */}
+                {(() => {
+                  const bookingSlot = slots.find(s => s.id === selectedBooking.slotId)
+                  const calType = bookingSlot?.calendarType
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'DATE', value: format(parseISO(selectedBooking.date), 'EEE, dd MMM yyyy') },
+                        { label: 'TIME', value: formatTime(selectedBooking.time) },
+                        { label: 'DURATION', value: `${selectedBooking.duration} min` },
+                        { label: 'PURPOSE', value: selectedBooking.bookingPurpose || '—' },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{label}</p>
+                          <p className="text-xs font-semibold text-[var(--text-primary)] mt-0.5 leading-tight">{value}</p>
+                        </div>
+                      ))}
+                      {calType && (
+                        <div className="col-span-2 bg-gray-50 rounded-lg p-2.5 flex items-center justify-between">
+                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Calendar</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${calTypeBadgeClass(calType)}`}>
+                            {calType}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  )
+                })()}
 
                 {/* Topic */}
                 <div>

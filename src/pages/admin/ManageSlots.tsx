@@ -1,16 +1,25 @@
 import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users, ChevronDown, X } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
+import { CALENDAR_TYPE_COLORS } from '../../types'
+import type { CalendarTypeRecord } from '../../types'
 
 export default function ManageSlots() {
-  const { slots, bookings, slotConfigs, generateSlots, removeSlot, clearAllSlots } = useBookings()
+  const { slots, bookings, slotConfigs, calendarTypeRecords, generateSlots, removeSlot, clearAllSlots, addCalendarType, deleteCalendarType } = useBookings()
   const { lecturers, loadLecturers } = useAuth()
 
   useEffect(() => { loadLecturers() }, [loadLecturers])
 
+  const [calendarType, setCalendarType] = useState<string>('')
+  const [showAddType, setShowAddType] = useState(false)
+  const [newTypeName, setNewTypeName] = useState('')
+  const [newTypeColor, setNewTypeColor] = useState<string>('blue')
+  const [addTypeLoading, setAddTypeLoading] = useState(false)
+  const [addTypeError, setAddTypeError] = useState('')
+  const [deleteTypeId, setDeleteTypeId] = useState<string | null>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [startTime, setStartTime] = useState('09:00')
@@ -23,8 +32,57 @@ export default function ManageSlots() {
   const [generated, setGenerated] = useState<number | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
+  const COLOR_ACTIVE: Record<string, string> = {
+    blue:   'bg-[var(--accent)] border-[var(--accent)] text-white',
+    purple: 'bg-purple-600 border-purple-600 text-white',
+    green:  'bg-emerald-600 border-emerald-600 text-white',
+    grey:   'bg-gray-600 border-gray-600 text-white',
+    orange: 'bg-orange-500 border-orange-500 text-white',
+    pink:   'bg-pink-600 border-pink-600 text-white',
+    teal:   'bg-teal-600 border-teal-600 text-white',
+  }
+  const COLOR_IDLE: Record<string, string> = {
+    blue:   'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]',
+    purple: 'border-purple-300 bg-purple-50 text-purple-700',
+    green:  'border-emerald-300 bg-emerald-50 text-emerald-700',
+    grey:   'border-gray-300 bg-gray-50 text-gray-600',
+    orange: 'border-orange-300 bg-orange-50 text-orange-700',
+    pink:   'border-pink-300 bg-pink-50 text-pink-700',
+    teal:   'border-teal-300 bg-teal-50 text-teal-700',
+  }
+  const COLOR_SWATCH: Record<string, string> = {
+    blue:   'bg-[var(--accent)]',
+    purple: 'bg-purple-600',
+    green:  'bg-emerald-600',
+    grey:   'bg-gray-500',
+    orange: 'bg-orange-500',
+    pink:   'bg-pink-600',
+    teal:   'bg-teal-600',
+  }
+
+  function typeColor(t: CalendarTypeRecord) { return t.color in COLOR_ACTIVE ? t.color : 'grey' }
+
+  // Initialise selected calendar type once records load
+  const effectiveCalendarType = calendarType ||
+    (calendarTypeRecords.length > 0 ? calendarTypeRecords[0].name : '')
+
   const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed').map(b => b.slotId))
   const canGenerate = startDate && endDate && startDate <= endDate && startTime < endTime
+
+  const COLOR_BADGE: Record<string, string> = {
+    blue:   'bg-[var(--accent-light)] text-[var(--accent)]',
+    purple: 'bg-purple-50 text-purple-700',
+    green:  'bg-emerald-50 text-emerald-700',
+    grey:   'bg-gray-100 text-gray-600',
+    orange: 'bg-orange-50 text-orange-700',
+    pink:   'bg-pink-50 text-pink-700',
+    teal:   'bg-teal-50 text-teal-700',
+  }
+
+  function slotBadgeClass(calType: string) {
+    const record = calendarTypeRecords.find(t => t.name === calType)
+    return COLOR_BADGE[record?.color ?? 'grey'] ?? 'bg-gray-100 text-gray-600'
+  }
 
   const previewInfo = useMemo(() => {
     if (!canGenerate) return null
@@ -63,6 +121,14 @@ export default function ManageSlots() {
     return groups
   }, [slots])
 
+  // Unique calendar types present across all existing slots
+  const allCalendarTypes = useMemo(() => {
+    const types = new Set(slots.map(s => s.calendarType))
+    return Array.from(types).sort()
+  }, [slots])
+
+  const [filterCalendarType, setFilterCalendarType] = useState<string>('')
+
   const allDates = Object.keys(groupedSlots).sort()
   const pastDates = allDates.filter(d => d < today)
   const upcomingDates = allDates.filter(d => d >= today)
@@ -70,9 +136,39 @@ export default function ManageSlots() {
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const result = await generateSlots({ startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends, lecturerName: lecturerName.trim() || undefined, classGroup: classGroup.trim() || undefined })
+    const result = await generateSlots({ startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends, calendarType: effectiveCalendarType, lecturerName: lecturerName.trim() || undefined, classGroup: classGroup.trim() || undefined })
     setGenerated(result.length)
     setTimeout(() => setGenerated(null), 4000)
+  }
+
+  async function handleAddType() {
+    const name = newTypeName.trim()
+    if (!name) return
+    if (calendarTypeRecords.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      setAddTypeError('A calendar type with this name already exists.')
+      return
+    }
+    setAddTypeLoading(true)
+    setAddTypeError('')
+    try {
+      const created = await addCalendarType(name, newTypeColor)
+      setCalendarType(created.name)
+      setNewTypeName('')
+      setNewTypeColor('blue')
+      setShowAddType(false)
+    } catch (err) {
+      setAddTypeError(err instanceof Error ? err.message : 'Failed to create type.')
+    } finally {
+      setAddTypeLoading(false)
+    }
+  }
+
+  async function handleDeleteType(id: string) {
+    setDeleteTypeId(null)
+    await deleteCalendarType(id)
+    if (calendarType === calendarTypeRecords.find(t => t.id === id)?.name) {
+      setCalendarType(calendarTypeRecords.find(t => t.id !== id)?.name ?? '')
+    }
   }
 
   const fieldCls = "w-full px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition bg-white"
@@ -93,6 +189,100 @@ export default function ManageSlots() {
             <Plus className="w-4 h-4 text-[var(--accent)]" />
             Generate Slots
           </h2>
+
+          {/* Calendar Type */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Calendar Type</label>
+              <button
+                type="button"
+                onClick={() => { setShowAddType(v => !v); setAddTypeError('') }}
+                className="text-xs text-[var(--accent)] hover:underline font-medium"
+              >
+                {showAddType ? 'Cancel' : '+ Add type'}
+              </button>
+            </div>
+
+            {/* Type pills from DB */}
+            <div className="flex flex-wrap gap-2">
+              {calendarTypeRecords.map(t => {
+                const c = typeColor(t)
+                const isSelected = effectiveCalendarType === t.name
+                return (
+                  <div key={t.id} className="relative group/pill">
+                    <button
+                      type="button"
+                      onClick={() => setCalendarType(t.name)}
+                      className={`pl-3.5 pr-7 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
+                        isSelected ? COLOR_ACTIVE[c] : `${COLOR_IDLE[c]} hover:border-opacity-60`
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                    {/* Delete button — hover reveal */}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTypeId(t.id)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-inherit opacity-0 group-hover/pill:opacity-60 hover:!opacity-100 transition-opacity"
+                      title={`Delete "${t.name}"`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Add new type inline form */}
+            {showAddType && (
+              <div className="mt-3 p-3.5 bg-gray-50 rounded-xl border border-[var(--border)] space-y-3 animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newTypeName}
+                    onChange={e => { setNewTypeName(e.target.value); setAddTypeError('') }}
+                    placeholder="Calendar name (e.g. Workshop)"
+                    maxLength={50}
+                    className={`${fieldCls} flex-1`}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddType() } }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddType}
+                    disabled={!newTypeName.trim() || addTypeLoading}
+                    className="px-4 py-2.5 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  >
+                    {addTypeLoading ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Color</p>
+                  <div className="flex gap-2">
+                    {CALENDAR_TYPE_COLORS.map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewTypeColor(c)}
+                        className={`w-6 h-6 rounded-full transition-all ${COLOR_SWATCH[c]} ${newTypeColor === c ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'opacity-70 hover:opacity-100'}`}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {addTypeError && <p className="text-xs text-red-500">{addTypeError}</p>}
+              </div>
+            )}
+
+            {/* Delete confirmation */}
+            {deleteTypeId && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)] animate-fade-in">
+                <span>Delete <strong>{calendarTypeRecords.find(t => t.id === deleteTypeId)?.name}</strong>? Existing slots keep their type.</span>
+                <button type="button" onClick={() => handleDeleteType(deleteTypeId)} className="text-red-500 font-semibold hover:text-red-600">Yes</button>
+                <button type="button" onClick={() => setDeleteTypeId(null)} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]">No</button>
+              </div>
+            )}
+          </div>
 
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div>
@@ -221,7 +411,7 @@ export default function ManageSlots() {
         )}
 
         {/* Slots list header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">
             {showPast ? 'All Slots' : 'Upcoming Slots'}{' '}
             <span className="text-[var(--text-muted)] font-normal">({visibleDates.length} date{visibleDates.length !== 1 ? 's' : ''})</span>
@@ -240,6 +430,33 @@ export default function ManageSlots() {
             )
           )}
         </div>
+
+        {/* Calendar type filter tabs — only when multiple types exist */}
+        {allCalendarTypes.length > 1 && (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <button
+              onClick={() => setFilterCalendarType('')}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${!filterCalendarType ? 'bg-[var(--text-primary)] border-[var(--text-primary)] text-white' : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+            >
+              All
+            </button>
+            {allCalendarTypes.map(type => {
+              const record = calendarTypeRecords.find(t => t.name === type)
+              const c = record?.color && record.color in COLOR_ACTIVE ? record.color : 'grey'
+              return (
+                <button
+                  key={type}
+                  onClick={() => setFilterCalendarType(type === filterCalendarType ? '' : type)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border-2 transition-colors ${
+                    filterCalendarType === type ? COLOR_ACTIVE[c] : `${COLOR_IDLE[c]}`
+                  }`}
+                >
+                  {type}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {allDates.length === 0 ? (
           <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
@@ -270,7 +487,9 @@ export default function ManageSlots() {
             {visibleDates.map((date, di) => {
               const isPast = date < today
               const isExpanded = !isPast || expandedPastDates.has(date)
-              const ds = groupedSlots[date]
+              const allDaySlots = groupedSlots[date]
+              const ds = filterCalendarType ? allDaySlots.filter(s => s.calendarType === filterCalendarType) : allDaySlots
+              if (ds.length === 0) return null
               const bookedInDay = ds.filter(s => bookedSlotIds.has(s.id)).length
               const pct = Math.round((bookedInDay / ds.length) * 100)
               return (
@@ -301,6 +520,11 @@ export default function ManageSlots() {
                           <Clock className="w-3 h-3 opacity-50" />
                           <span className="font-medium">{formatTime(slot.time)}</span>
                           <span className="opacity-60">{slot.duration}m</span>
+                          {!filterCalendarType && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${slotBadgeClass(slot.calendarType)}`}>
+                              {slot.calendarType}
+                            </span>
+                          )}
                           {slot.lecturerName && (
                             <span className="flex items-center gap-1 opacity-70">
                               <User className="w-3 h-3" />{slot.lecturerName}
