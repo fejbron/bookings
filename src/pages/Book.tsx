@@ -1,19 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, ArrowRight, CalendarDays, Check, FileText, Mail, Presentation, User, AlertCircle, Tag } from 'lucide-react'
+import {
+  ArrowLeft, CalendarDays, Check, Clock, FileText,
+  Mail, Presentation, User, AlertCircle, Tag, ChevronRight,
+} from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
 import type { PresentationSlot } from '../types'
 
-const STEP_LABELS = ['Date', 'Time', 'Details']
+type View = 'select' | 'confirm'
 
 export default function Book() {
   const navigate = useNavigate()
   const { getAvailableDates, getAvailableSlots, bookSlot, adminSettings } = useBookings()
 
-  const [step, setStep] = useState(0)
+  const [view, setView] = useState<View>('select')
   const [date, setDate] = useState<Date | null>(null)
   const [slotId, setSlotId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -21,10 +24,10 @@ export default function Book() {
   const [presentationTopic, setPresentationTopic] = useState('')
   const [notes, setNotes] = useState('')
   const [bookingPurpose, setBookingPurpose] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [bookingError, setBookingError] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitted, setSubmitted] = useState(false)
 
   const availableDates = useMemo(() => getAvailableDates(), [getAvailableDates])
   const slotsForDate = useMemo(
@@ -36,22 +39,20 @@ export default function Book() {
     [slotsForDate, slotId],
   )
 
-  const canNext = (() => {
-    if (step === 0) return !!date
-    if (step === 1) return !!slotId
-    if (step === 2) return !!name.trim() && !!email.trim() && !!presentationTopic.trim() && !!bookingPurpose
-    return false
-  })()
+  function handleDateSelect(d: Date) {
+    setDate(d)
+    setSlotId(null)
+  }
 
   function validateForm(): boolean {
-    const newErrors: Record<string, string> = {}
-    if (!bookingPurpose) newErrors.purpose = 'Please select a purpose.'
-    if (!name.trim()) newErrors.name = 'Full name is required.'
-    if (!email.trim()) newErrors.email = 'Email is required.'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) newErrors.email = 'Please enter a valid email.'
-    if (!presentationTopic.trim()) newErrors.topic = 'Presentation topic is required.'
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const e: Record<string, string> = {}
+    if (adminSettings.bookingPurposes.length > 0 && !bookingPurpose) e.purpose = 'Please select a purpose.'
+    if (!name.trim()) e.name = 'Full name is required.'
+    if (!email.trim()) e.email = 'Email is required.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = 'Enter a valid email.'
+    if (!presentationTopic.trim()) e.topic = 'Presentation topic is required.'
+    setErrors(e)
+    return Object.keys(e).length === 0
   }
 
   async function handleConfirm() {
@@ -74,34 +75,40 @@ export default function Book() {
     }
   }
 
+  function resetAll() {
+    setView('select'); setDate(null); setSlotId(null)
+    setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setBookingPurpose('')
+    setErrors({}); setBookingError(''); setSubmitted(false)
+  }
+
+  // ── Success screen ──────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl border border-[var(--border)] p-10 max-w-md w-full text-center animate-scale-in">
-          <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-5">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--bg-page)]">
+        <div className="bg-white rounded-2xl border border-[var(--border)] p-10 max-w-sm w-full text-center animate-scale-in" style={{ boxShadow: 'var(--card-shadow)' }}>
+          <div className="w-14 h-14 rounded-full bg-[var(--status-confirmed-bg)] text-[var(--status-confirmed)] flex items-center justify-center mx-auto mb-5">
             <Check className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Booking Confirmed!</h2>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">You're booked!</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">
             Your presentation on{' '}
-            <span className="font-medium text-[var(--text-primary)]">{date && format(date, 'EEEE, MMMM d')}</span>{' '}
-            at <span className="font-medium text-[var(--text-primary)]">{selectedSlot && formatTime(selectedSlot.time)}</span> is booked.
+            <span className="font-semibold text-[var(--text-primary)]">{date && format(date, 'EEEE, MMMM d')}</span>{' '}
+            at{' '}
+            <span className="font-semibold text-[var(--text-primary)]">{selectedSlot && formatTime(selectedSlot.time)}</span>{' '}
+            is confirmed.
           </p>
-          <div className="mt-8 flex flex-col gap-2.5">
+          <div className="mt-8 space-y-2.5">
             <button
               onClick={() => navigate('/my-bookings')}
-              className="w-full bg-[var(--accent)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors"
+              className="w-full bg-[var(--accent)] text-white py-2.5 rounded-full text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors"
             >
               View My Bookings
             </button>
             <button
-              onClick={() => {
-                setSubmitted(false); setStep(0); setDate(null); setSlotId(null)
-                setName(''); setEmail(''); setPresentationTopic(''); setNotes(''); setBookingPurpose(''); setErrors({})
-              }}
-              className="w-full text-[var(--text-secondary)] py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors border border-[var(--border)]"
+              onClick={resetAll}
+              className="w-full text-[var(--text-secondary)] py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 border border-[var(--border)] transition-colors"
             >
-              Book Another
+              Book Another Slot
             </button>
           </div>
         </div>
@@ -109,186 +116,241 @@ export default function Book() {
     )
   }
 
-  return (
-    <div className="min-h-screen">
-      <div className="max-w-3xl mx-auto px-6 sm:px-8 py-8 sm:py-10">
-        {/* Header */}
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Book a Presentation Slot</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Pick from dates and times set by the admin.</p>
+  // ── Shared left info panel ──────────────────────────────────────────────────
+  const InfoPanel = (
+    <div className="flex flex-col gap-5 p-6 md:p-8">
+      <div>
+        <div className="w-10 h-10 rounded-xl bg-[var(--accent-light)] flex items-center justify-center mb-4">
+          <Presentation className="w-5 h-5 text-[var(--accent)]" />
         </div>
+        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+          Presentation Booking
+        </p>
+        <h1 className="text-lg font-bold text-[var(--text-primary)] leading-snug">
+          {adminSettings.welcomeMessage || 'Book a Slot'}
+        </h1>
+      </div>
 
-        {/* Step progress */}
-        <div className="flex items-center gap-2 mb-8">
-          {STEP_LABELS.map((label, i) => (
-            <div key={label} className="flex-1 flex items-center gap-2">
-              <div className="flex-1">
-                <div className={`h-1 rounded-full transition-all ${i <= step ? 'bg-[var(--accent)]' : 'bg-gray-200'}`} />
-                <span className={`block text-xs mt-1.5 font-medium ${i <= step ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>{label}</span>
-              </div>
+      {(date || selectedSlot) && (
+        <div className="space-y-2.5 text-sm text-[var(--text-secondary)]">
+          {selectedSlot && (
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+              <span>{selectedSlot.duration} min</span>
             </div>
-          ))}
+          )}
+          {date && (
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+              <span>{format(date, 'EEEE, MMMM d, yyyy')}</span>
+            </div>
+          )}
+          {selectedSlot && (
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+              <span className="font-semibold text-[var(--text-primary)]">{formatTime(selectedSlot.time)}</span>
+            </div>
+          )}
         </div>
+      )}
+    </div>
+  )
 
-        {/* Step 0 — Date */}
-        {step === 0 && (
-          <div className="space-y-4 animate-fade-in-up">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">Pick a Date</h2>
-              {date && (
-                <span className="text-xs text-[var(--text-muted)] bg-gray-100 px-2.5 py-1 rounded-full font-medium">
-                  {slotsForDate.length} slot{slotsForDate.length !== 1 ? 's' : ''} available
-                </span>
-              )}
-            </div>
-            <Calendar selected={date} onSelect={setDate} availableDates={availableDates} />
-            {availableDates.length === 0 && (
-              <p className="text-sm text-amber-700 bg-amber-50 px-4 py-2.5 rounded-lg flex items-center gap-2 border border-amber-100">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+  // ── VIEW: select (Calendly 3-column) ────────────────────────────────────────
+  if (view === 'select') {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] flex items-start justify-center p-4 sm:p-8 py-8 sm:py-12">
+        <div
+          className="w-full max-w-5xl bg-white rounded-2xl border border-[var(--border)] overflow-hidden flex flex-col lg:flex-row"
+          style={{ boxShadow: 'var(--card-shadow)' }}
+        >
+          {/* Left panel */}
+          <div className="lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-[var(--border)]">
+            {InfoPanel}
+          </div>
+
+          {/* Center — Calendar */}
+          <div className="flex-1 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-[var(--border)]">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-5">Select a Date</h2>
+            {availableDates.length === 0 ? (
+              <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 px-4 py-3 rounded-xl">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 No slots available yet. Ask your admin to generate presentation slots.
-              </p>
+              </div>
+            ) : (
+              <Calendar
+                selected={date}
+                onSelect={handleDateSelect}
+                availableDates={availableDates}
+              />
             )}
+          </div>
+
+          {/* Right — Time slots (appears after date selected) */}
+          <div className={`lg:w-56 shrink-0 flex flex-col transition-all duration-300 ${date ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             {date && (
-              <p className="text-sm text-[var(--accent)] font-medium flex items-center gap-2">
-                <CalendarDays className="w-4 h-4" />
-                {format(date, 'EEEE, MMMM d, yyyy')}
-              </p>
+              <div className="p-6 md:p-8 flex flex-col h-full animate-slide-in-right">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{format(date, 'EEEE')}</h2>
+                <p className="text-xs text-[var(--text-muted)] mb-5">{format(date, 'MMMM d, yyyy')}</p>
+
+                <div className="flex-1 overflow-y-auto max-h-80 space-y-0 pr-0.5">
+                  <TimeSlots slots={slotsForDate} selected={slotId} onSelect={setSlotId} />
+                </div>
+
+                {slotId && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border)] animate-fade-in">
+                    <button
+                      onClick={() => setView('confirm')}
+                      className="w-full flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white py-2.5 rounded-full text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors"
+                    >
+                      Confirm time
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
+      </div>
+    )
+  }
 
-        {/* Step 1 — Time */}
-        {step === 1 && (
-          <div className="space-y-4 animate-fade-in-up">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                Select a Time
-                {date && <span className="text-sm font-normal text-[var(--text-muted)] ml-2">{format(date, 'MMM d')}</span>}
-              </h2>
-              <span className="text-xs text-[var(--text-muted)] bg-gray-100 px-2.5 py-1 rounded-full font-medium">
-                {slotsForDate.length} available
-              </span>
+  // ── VIEW: confirm (2-column) ────────────────────────────────────────────────
+  const canSubmit = !!name.trim() && !!email.trim() && !!presentationTopic.trim() &&
+    (adminSettings.bookingPurposes.length === 0 || !!bookingPurpose)
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-page)] flex items-start justify-center p-4 sm:p-8 py-8 sm:py-12">
+      <div
+        className="w-full max-w-3xl bg-white rounded-2xl border border-[var(--border)] overflow-hidden flex flex-col md:flex-row animate-fade-in"
+        style={{ boxShadow: 'var(--card-shadow)' }}
+      >
+        {/* Left — summary */}
+        <div className="md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)]">
+          <div className="p-6 md:p-8 flex flex-col h-full">
+            <button
+              onClick={() => setView('select')}
+              className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm mb-6 transition-colors w-fit"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-light)] flex items-center justify-center mb-4">
+              <Presentation className="w-5 h-5 text-[var(--accent)]" />
             </div>
-            <TimeSlots slots={slotsForDate} selected={slotId} onSelect={setSlotId} />
-          </div>
-        )}
+            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+              Presentation Booking
+            </p>
+            <h1 className="text-base font-bold text-[var(--text-primary)] mb-5">
+              {adminSettings.welcomeMessage || 'Book a Slot'}
+            </h1>
 
-        {/* Step 2 — Details */}
-        {step === 2 && (
-          <div className="space-y-5 animate-fade-in-up">
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">Your Details</h2>
-
-            {/* Booking summary */}
-            <div className="bg-[var(--accent-light)] rounded-xl p-4 text-sm border border-orange-100">
-              <div className="grid grid-cols-2 gap-y-2">
-                <span className="text-[var(--text-muted)]">Date</span>
-                <span className="font-medium text-[var(--text-primary)]">{date && format(date, 'EEE, MMM d, yyyy')}</span>
-                <span className="text-[var(--text-muted)]">Time</span>
-                <span className="font-medium text-[var(--text-primary)]">{selectedSlot && formatTime(selectedSlot.time)}</span>
-                <span className="text-[var(--text-muted)]">Duration</span>
-                <span className="font-semibold text-[var(--accent)]">{selectedSlot?.duration} min</span>
+            <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                <span>{selectedSlot?.duration} min</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                <span>{date && format(date, 'EEEE, MMMM d, yyyy')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {selectedSlot && formatTime(selectedSlot.time)}
+                </span>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Purpose of booking */}
+        {/* Right — form */}
+        <div className="flex-1 p-6 md:p-8">
+          <h2 className="text-base font-semibold text-[var(--text-primary)] mb-6">Your Information</h2>
+
+          <div className="space-y-4">
+            {/* Purpose chips */}
             {adminSettings.bookingPurposes.length > 0 && (
-              <div className="bg-white rounded-xl border border-[var(--border)] p-5">
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-3 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-[var(--text-muted)]" /> Purpose of Booking
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" /> Purpose
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {adminSettings.bookingPurposes.map(purpose => (
+                  {adminSettings.bookingPurposes.map(p => (
                     <button
-                      key={purpose}
+                      key={p}
                       type="button"
-                      onClick={() => { setBookingPurpose(purpose); setErrors(prev => ({ ...prev, purpose: '' })) }}
-                      className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                        bookingPurpose === purpose
+                      onClick={() => { setBookingPurpose(p); setErrors(prev => ({ ...prev, purpose: '' })) }}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${
+                        bookingPurpose === p
                           ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
                           : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
                       }`}
                     >
-                      {purpose}
+                      {p}
                     </button>
                   ))}
                 </div>
-                {errors.purpose && <p className="mt-2 text-xs text-red-500">{errors.purpose}</p>}
+                {errors.purpose && <p className="mt-1.5 text-xs text-red-500">{errors.purpose}</p>}
               </div>
             )}
 
-            <div className="bg-white rounded-xl border border-[var(--border)] p-5 space-y-4">
-              {[
-                { icon: User, label: 'Full Name', key: 'name', type: 'text', val: name, setter: setName, placeholder: 'John Doe', err: errors.name, maxLength: 100 },
-                { icon: Mail, label: 'Email', key: 'email', type: 'email', val: email, setter: setEmail, placeholder: 'student@example.com', err: errors.email, maxLength: 254 },
-                { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: presentationTopic, setter: setPresentationTopic, placeholder: 'e.g. Final Year Project Demo', err: errors.topic, maxLength: 200 },
-              ].map(field => (
-                <div key={field.key}>
-                  <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5 flex items-center gap-1.5">
-                    <field.icon className="w-3.5 h-3.5 text-[var(--text-muted)]" /> {field.label}
-                  </label>
-                  <input
-                    type={field.type}
-                    value={field.val}
-                    onChange={e => { field.setter(e.target.value); setErrors(prev => ({ ...prev, [field.key]: '' })) }}
-                    placeholder={field.placeholder}
-                    maxLength={field.maxLength}
-                    className={`w-full px-3.5 py-2.5 rounded-lg border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition ${field.err ? 'border-red-300' : 'border-[var(--border)]'}`}
-                  />
-                  {field.err && <p className="mt-1 text-xs text-red-500">{field.err}</p>}
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[var(--text-muted)]" /> Notes (optional)
+            {/* Text fields */}
+            {[
+              { icon: User, label: 'Full Name', key: 'name', type: 'text', val: name, set: setName, placeholder: 'John Doe', err: errors.name },
+              { icon: Mail, label: 'Email Address', key: 'email', type: 'email', val: email, set: setEmail, placeholder: 'student@example.com', err: errors.email },
+              { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: presentationTopic, set: setPresentationTopic, placeholder: 'e.g. Final Year Project Demo', err: errors.topic },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                  <f.icon className="w-3.5 h-3.5" /> {f.label}
                 </label>
-                <textarea
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Anything we should know?"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition resize-none"
+                <input
+                  type={f.type}
+                  value={f.val}
+                  onChange={e => { f.set(e.target.value); setErrors(prev => ({ ...prev, [f.key]: '' })) }}
+                  placeholder={f.placeholder}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition ${f.err ? 'border-red-300 bg-red-50' : 'border-[var(--border)]'}`}
                 />
+                {f.err && <p className="mt-1 text-xs text-red-500">{f.err}</p>}
               </div>
+            ))}
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Notes (optional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Anything we should know?"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition resize-none"
+              />
             </div>
           </div>
-        )}
 
-        {/* Booking error */}
-        {bookingError && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg border border-red-100">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {bookingError}
-          </div>
-        )}
+          {bookingError && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-3 rounded-xl">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {bookingError}
+            </div>
+          )}
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-[var(--border)]">
-          <button
-            onClick={() => setStep(s => s - 1)}
-            disabled={step === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-100 transition-colors disabled:opacity-0 disabled:pointer-events-none"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-
-          {step < 2 ? (
-            <button
-              onClick={() => setStep(s => s + 1)}
-              disabled={!canNext}
-              className="flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next <ArrowRight className="w-4 h-4" />
-            </button>
-          ) : (
+          <div className="mt-6 flex justify-end">
             <button
               onClick={handleConfirm}
-              disabled={!canNext || submitting}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!canSubmit || submitting}
+              className="flex items-center gap-2 bg-[var(--accent)] text-white px-7 py-2.5 rounded-full text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4" /> {submitting ? 'Confirming…' : 'Confirm Booking'}
+              <Check className="w-4 h-4" />
+              {submitting ? 'Confirming…' : 'Confirm Booking'}
             </button>
-          )}
+          </div>
         </div>
       </div>
     </div>

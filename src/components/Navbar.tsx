@@ -48,16 +48,16 @@ export default function Sidebar() {
         <CalendarDays className="w-7 h-7 text-[var(--accent)]" />
         <span className="text-lg font-bold text-[var(--text-primary)]">BookSlot</span>
         {isSuperAdmin ? (
-          <span className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md uppercase tracking-wider">
-            Super Admin
+          <span className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            Super
           </span>
         ) : isAdmin && (
-          <span className="text-[10px] font-semibold bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-md uppercase tracking-wider">
+          <span className="text-[10px] font-semibold bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full uppercase tracking-wider">
             Admin
           </span>
         )}
         {isLecturer && (
-          <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-wider">
+          <span className="text-[10px] font-semibold bg-[var(--accent-light)] text-[var(--accent)] px-2 py-0.5 rounded-full uppercase tracking-wider">
             Lecturer
           </span>
         )}
