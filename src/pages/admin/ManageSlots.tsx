@@ -258,7 +258,7 @@ export default function ManageSlots() {
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Color</p>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     {([
                       { color: 'blue',   label: 'Presentation'   },
                       { color: 'purple', label: 'Office Meeting' },
@@ -267,19 +267,22 @@ export default function ManageSlots() {
                       { color: 'orange', label: 'Orange'         },
                       { color: 'pink',   label: 'Pink'           },
                       { color: 'teal',   label: 'Teal'           },
-                    ] as { color: string; label: string }[]).map(({ color, label }) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setNewTypeColor(color)}
-                        className={`flex flex-col items-center gap-1 transition-all ${newTypeColor === color ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-90'}`}
-                      >
-                        <span className={`w-6 h-6 rounded-full ${COLOR_SWATCH[color]} ${newTypeColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`} />
-                        <span className={`text-[10px] font-medium ${newTypeColor === color ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+                    ] as { color: string; label: string }[]).map(({ color, label }) => {
+                      const isSelected = newTypeColor === color
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setNewTypeColor(color)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                            isSelected ? COLOR_ACTIVE[color] : `${COLOR_IDLE[color]} opacity-70 hover:opacity-100`
+                          }`}
+                        >
+                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${COLOR_SWATCH[color]}`} />
                           {label}
-                        </span>
-                      </button>
-                    ))}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
                 {addTypeError && <p className="text-xs text-red-500">{addTypeError}</p>}
