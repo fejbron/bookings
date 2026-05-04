@@ -8,7 +8,7 @@ import type { Booking, CalendarTypeRecord, PresentationSlot } from '../types'
 import { formatTime } from './TimeSlots'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const HOUR_HEIGHT = 64        // px per hour
+const HOUR_HEIGHT = 72        // px per hour
 const START_HOUR  = 7         // 7 am
 const END_HOUR    = 21        // 9 pm
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
@@ -134,33 +134,70 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
     }
   }
 
-  // Booking block renderer (called inline, not as a React component to avoid hooks issues)
-  function renderBlock(b: Booking, colIndex: number, totalCols: number) {
+  // ── Lane assignment (Google-Calendar style) ────────────────────────────────
+  // Each booking gets a lane (column within the day column). Bookings that
+  // don't overlap get lane 0 (full-width). Overlapping ones are spread across
+  // as many lanes as needed — only DIRECT overlaps are counted, never chained.
+  function assignLanes(list: Booking[]): Map<string, { lane: number; total: number }> {
+    const sorted = [...list].sort((a, b2) => a.time.localeCompare(b2.time))
+    const laneEnds: number[] = []          // end-minute for each lane
+    const laneMap = new Map<string, number>()
+
+    for (const b of sorted) {
+      const s = timeToMinutes(b.time)
+      const e = s + b.duration
+      let lane = laneEnds.findIndex(end => end <= s)
+      if (lane === -1) lane = laneEnds.length
+      laneEnds[lane] = e
+      laneMap.set(b.id, lane)
+    }
+
+    // For each booking, compute total concurrent lanes (max lane+1 of all that overlap it)
+    const result = new Map<string, { lane: number; total: number }>()
+    for (const b of sorted) {
+      const s = timeToMinutes(b.time)
+      const e = s + b.duration
+      const lane = laneMap.get(b.id)!
+      let maxLane = lane
+      for (const o of sorted) {
+        if (o.id === b.id) continue
+        const os = timeToMinutes(o.time)
+        const oe = os + o.duration
+        if (s < oe && e > os) maxLane = Math.max(maxLane, laneMap.get(o.id)!)
+      }
+      result.set(b.id, { lane, total: maxLane + 1 })
+    }
+    return result
+  }
+
+  // Booking block renderer
+  function renderBlock(b: Booking, lane: number, total: number) {
     const startMin = timeToMinutes(b.time)
     const topMin = startMin - START_HOUR * 60
     if (topMin < 0 || topMin >= (END_HOUR - START_HOUR) * 60) return null
-    const top = minToPx(topMin)
-    const height = Math.max(minToPx(b.duration), 28)
-    const c = colorForBooking(b)
+    const top    = minToPx(topMin)
+    const height = Math.max(minToPx(b.duration), 24)
+    const c      = colorForBooking(b)
     const status = getStatusLabel(b, todayStr)
     const isSelected = b.id === selectedBookingId
-    const isShort = height < 48
+    const isShort    = height < 44
 
-    // Side-by-side layout for overlapping (simplified: use colIndex offset)
-    const widthPct = 100 / totalCols
-    const leftPct = widthPct * colIndex
+    const gapPct   = 0.5
+    const widthPct = (100 - gapPct * (total + 1)) / total
+    const leftPct  = gapPct + lane * (widthPct + gapPct)
 
     return (
       <div
         key={b.id}
         onClick={() => onSelectBooking(b)}
-        className={`absolute rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:z-20 ${c.bg} ${isSelected ? 'ring-2 ring-gray-400 shadow-md z-20' : 'z-10'}`}
+        className={`absolute rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md hover:z-20 ${c.bg} ${isSelected ? 'ring-2 ring-offset-0 shadow-md z-20' : 'z-10'}`}
         style={{
           top,
           height,
-          left: `${leftPct + 0.5}%`,
-          width: `${widthPct - 1}%`,
+          left:  `${leftPct}%`,
+          width: `${widthPct}%`,
           borderLeft: `3px solid ${c.border}`,
+          ringColor: c.border,
         }}
       >
         <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">
@@ -170,13 +207,13 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
             </p>
           ) : (
             <>
-              <p className={`text-[11px] font-semibold truncate leading-tight ${c.text}`}>{b.studentName}</p>
-              {height >= 56 && (
-                <p className={`text-[10px] truncate opacity-60 leading-tight ${c.text}`}>{b.presentationTopic}</p>
+              <p className={`text-[11px] font-bold truncate leading-tight ${c.text}`}>{b.studentName}</p>
+              {height >= 52 && (
+                <p className={`text-[10px] truncate opacity-70 leading-tight mt-0.5 ${c.text}`}>{b.presentationTopic}</p>
               )}
               <div className="mt-auto flex items-center justify-between gap-1 pt-0.5">
                 <p className={`text-[9px] opacity-60 ${c.text}`}>
-                  {formatTime(b.time)} → {formatTime(endTimeStr(b.time, b.duration))}
+                  {formatTime(b.time)} – {formatTime(endTimeStr(b.time, b.duration))}
                 </p>
                 <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded leading-none ${status.cls}`}>
                   {status.text}
@@ -191,26 +228,8 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
 
   // Time grid column (shared between day/week)
   function renderGridColumn(key: string, bookingList: Booking[], highlight = false) {
-    // Simple overlap detection: group by overlapping time ranges
-    type BookingGroup = Booking[]
-    const groups: BookingGroup[] = []
-    const sorted = [...bookingList].sort((a, b) => a.time.localeCompare(b.time))
-
-    for (const b of sorted) {
-      const startMin = timeToMinutes(b.time)
-      const endMin = startMin + b.duration
-      const group = groups.find(g =>
-        g.some(gb => {
-          const gs = timeToMinutes(gb.time)
-          const ge = gs + gb.duration
-          return startMin < ge && endMin > gs
-        })
-      )
-      if (group) group.push(b)
-      else groups.push([b])
-    }
-
-    const showNow = highlight && nowPx > 0 && nowPx < TOTAL_HEIGHT
+    const laneInfo = assignLanes(bookingList)
+    const showNow  = highlight && nowPx > 0 && nowPx < TOTAL_HEIGHT
 
     return (
       <div
@@ -234,10 +253,11 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
           />
         ))}
 
-        {/* Booking blocks — render groups with side-by-side layout */}
-        {groups.map((group, _gi) =>
-          group.map((b, i) => renderBlock(b, i, group.length))
-        )}
+        {/* Booking blocks */}
+        {bookingList.map(b => {
+          const info = laneInfo.get(b.id)!
+          return renderBlock(b, info.lane, info.total)
+        })}
 
         {/* Current time line */}
         {showNow && (
