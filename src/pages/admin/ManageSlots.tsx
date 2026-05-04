@@ -258,15 +258,19 @@ export default function ManageSlots() {
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Color</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {CALENDAR_TYPE_COLORS.map(c => (
                       <button
                         key={c}
                         type="button"
                         onClick={() => setNewTypeColor(c)}
-                        className={`w-6 h-6 rounded-full transition-all ${COLOR_SWATCH[c]} ${newTypeColor === c ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'opacity-70 hover:opacity-100'}`}
-                        title={c}
-                      />
+                        className={`flex flex-col items-center gap-1 transition-all ${newTypeColor === c ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-90'}`}
+                      >
+                        <span className={`w-6 h-6 rounded-full ${COLOR_SWATCH[c]} ${newTypeColor === c ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`} />
+                        <span className={`text-[10px] font-medium capitalize ${newTypeColor === c ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+                          {c}
+                        </span>
+                      </button>
                     ))}
                   </div>
                 </div>
