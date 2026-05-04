@@ -246,7 +246,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      <div className={`mx-auto px-6 sm:px-8 py-8 sm:py-10 transition-all duration-300 ${selectedBooking ? 'max-w-5xl' : 'max-w-4xl'}`}>
+      <div className={`mx-auto px-6 sm:px-8 py-8 sm:py-10 transition-all duration-300 ${pageView === 'list' && selectedBooking ? 'max-w-5xl' : 'max-w-4xl'}`}>
         {/* Header */}
         <div className="mb-8 animate-fade-in-up">
           <div className="flex items-start justify-between flex-wrap gap-3">
@@ -314,6 +314,112 @@ export default function Dashboard() {
               onSelectBooking={b => setSelectedBooking(prev => prev?.id === b.id ? null : b)}
               selectedBookingId={selectedBooking?.id}
             />
+          </div>
+        )}
+
+        {/* ── Calendar view booking detail modal ── */}
+        {pageView === 'calendar' && selectedBooking && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 p-4"
+            onClick={e => { if (e.target === e.currentTarget) setSelectedBooking(null) }}
+          >
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl animate-fade-in-up overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Booking Detail</span>
+                <button onClick={() => setSelectedBooking(null)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-gray-100 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-bold text-sm shrink-0">
+                    {selectedBooking.studentName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[var(--text-primary)]">{selectedBooking.studentName}</p>
+                    <p className="text-xs text-[var(--text-muted)] truncate">{selectedBooking.studentEmail}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <StatusBadge status={selectedBooking.status} />
+                  {isCompleted(selectedBooking.date, selectedBooking.time, selectedBooking.duration) && selectedBooking.status === 'confirmed' && (
+                    <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Completed</span>
+                  )}
+                </div>
+                {(() => {
+                  const bookingSlot = slots.find(s => s.id === selectedBooking.slotId)
+                  const calType = bookingSlot?.calendarType
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'DATE',     value: format(parseISO(selectedBooking.date), 'EEE, dd MMM yyyy') },
+                        { label: 'TIME',     value: formatTime(selectedBooking.time) },
+                        { label: 'DURATION', value: `${selectedBooking.duration} min` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{label}</p>
+                          <p className="text-xs font-semibold text-[var(--text-primary)] mt-0.5">{value}</p>
+                        </div>
+                      ))}
+                      {calType && (
+                        <div className="col-span-2 bg-gray-50 rounded-lg p-2.5 flex items-center justify-between">
+                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Calendar</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${calTypeBadgeClass(calType)}`}>{calType}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Presentation Topic</p>
+                  <p className="text-sm text-[var(--text-primary)]">{selectedBooking.presentationTopic}</p>
+                </div>
+                {selectedBooking.notes && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Student Notes</p>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{selectedBooking.notes}</p>
+                  </div>
+                )}
+                {selectedBooking.adminComment && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Internal Note</p>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic">{selectedBooking.adminComment}</p>
+                  </div>
+                )}
+                <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+                  {selectedBooking.status === 'pending' && (
+                    <button
+                      onClick={() => { confirmBooking(selectedBooking.id); setSelectedBooking(prev => prev ? { ...prev, status: 'confirmed' } : null) }}
+                      className="w-full flex items-center justify-center gap-2 bg-[var(--status-confirmed)] text-white py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      <CheckCircle className="w-4 h-4" /> Confirm Booking
+                    </button>
+                  )}
+                  {selectedBooking.status === 'confirmed' && selectedBooking.date >= today && !isCompleted(selectedBooking.date, selectedBooking.time, selectedBooking.duration) && (
+                    <button
+                      onClick={() => { setSelectedBooking(null); openReschedule(selectedBooking) }}
+                      className="w-full flex items-center justify-center gap-2 border border-[var(--accent)] text-[var(--accent)] py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-light)] transition-colors"
+                    >
+                      <CalendarDays className="w-4 h-4" /> Reschedule
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setSelectedBooking(null); openComment(selectedBooking) }}
+                    className="w-full flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--text-secondary)] py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    <MessageSquare className="w-4 h-4" /> {selectedBooking.adminComment ? 'Edit Note' : 'Add Note'}
+                  </button>
+                  {(selectedBooking.status === 'confirmed' || selectedBooking.status === 'pending') && (
+                    <button
+                      onClick={() => { cancelBooking(selectedBooking.id); setSelectedBooking(prev => prev ? { ...prev, status: 'cancelled' } : null) }}
+                      className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-500 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" /> Cancel Booking
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
