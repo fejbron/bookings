@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Search, AlertCircle, Download, Filter, X, MessageSquare, CalendarDays, CheckCircle, Plus, User, Mail, Presentation, FileText, Tag } from 'lucide-react'
+import { Search, AlertCircle, Download, Filter, X, MessageSquare, CalendarDays, CheckCircle, Plus, User, Mail, Presentation, FileText, Tag, LayoutList } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
+import CalendarView from '../../components/CalendarView'
 import type { Booking } from '../../types'
 
 const COLOR_BADGE: Record<string, string> = {
@@ -19,6 +20,7 @@ type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function Dashboard() {
   const { bookings, slots, calendarTypeRecords, cancelBooking, confirmBooking, exportBookingsCSV, rescheduleBooking, addAdminComment, getAvailableSlots, bookSlot, adminSettings } = useBookings()
+  const [pageView, setPageView] = useState<'list' | 'calendar'>('list')
 
   function calTypeBadgeClass(typeName: string) {
     const record = calendarTypeRecords.find(t => t.name === typeName)
@@ -256,6 +258,22 @@ export default function Dashboard() {
               <p className="mt-1 text-sm text-[var(--text-secondary)]">{bookings.filter(b => b.status === 'confirmed' && b.date >= today).length} upcoming presentation{bookings.filter(b => b.status === 'confirmed' && b.date >= today).length !== 1 ? 's' : ''}</p>
             </div>
             <div className="flex items-center gap-2">
+              {/* List / Calendar toggle */}
+              <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden">
+                <button
+                  onClick={() => setPageView('list')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${pageView === 'list' ? 'bg-[var(--text-primary)] text-white' : 'text-[var(--text-muted)] hover:bg-gray-50'}`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" /> List
+                </button>
+                <button
+                  onClick={() => setPageView('calendar')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${pageView === 'calendar' ? 'bg-[var(--text-primary)] text-white' : 'text-[var(--text-muted)] hover:bg-gray-50'}`}
+                >
+                  <CalendarDays className="w-3.5 h-3.5" /> Calendar
+                </button>
+              </div>
+
               <button
                 onClick={openNewBooking}
                 className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
@@ -289,8 +307,21 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {/* ── Calendar view ── */}
+        {pageView === 'calendar' && (
+          <div className="animate-fade-in">
+            <CalendarView
+              bookings={bookings}
+              slots={slots}
+              calendarTypeRecords={calendarTypeRecords}
+              onSelectBooking={b => setSelectedBooking(prev => prev?.id === b.id ? null : b)}
+              selectedBookingId={selectedBooking?.id}
+            />
+          </div>
+        )}
+
         {/* Main content + detail panel */}
-        <div className="flex gap-5 items-start">
+        {pageView === 'list' && <div className="flex gap-5 items-start">
           {/* Left column — list */}
           <div className="flex-1 min-w-0">
             {/* Tabs */}
@@ -631,7 +662,8 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
+
       </div>
 
       {/* ── New Booking Modal ── */}

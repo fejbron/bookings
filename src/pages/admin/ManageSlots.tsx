@@ -4,7 +4,6 @@ import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, User, Users, Chevro
 import { useBookings } from '../../context/BookingContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
-import { CALENDAR_TYPE_COLORS } from '../../types'
 import type { CalendarTypeRecord } from '../../types'
 
 export default function ManageSlots() {
