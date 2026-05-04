@@ -259,16 +259,24 @@ export default function ManageSlots() {
                 <div>
                   <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Color</p>
                   <div className="flex flex-wrap gap-3">
-                    {CALENDAR_TYPE_COLORS.map(c => (
+                    {([
+                      { color: 'blue',   label: 'Presentation'   },
+                      { color: 'purple', label: 'Office Meeting' },
+                      { color: 'green',  label: 'Personal'       },
+                      { color: 'grey',   label: 'Other'          },
+                      { color: 'orange', label: 'Orange'         },
+                      { color: 'pink',   label: 'Pink'           },
+                      { color: 'teal',   label: 'Teal'           },
+                    ] as { color: string; label: string }[]).map(({ color, label }) => (
                       <button
-                        key={c}
+                        key={color}
                         type="button"
-                        onClick={() => setNewTypeColor(c)}
-                        className={`flex flex-col items-center gap-1 transition-all ${newTypeColor === c ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-90'}`}
+                        onClick={() => setNewTypeColor(color)}
+                        className={`flex flex-col items-center gap-1 transition-all ${newTypeColor === color ? 'opacity-100 scale-105' : 'opacity-60 hover:opacity-90'}`}
                       >
-                        <span className={`w-6 h-6 rounded-full ${COLOR_SWATCH[c]} ${newTypeColor === c ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`} />
-                        <span className={`text-[10px] font-medium capitalize ${newTypeColor === c ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
-                          {c}
+                        <span className={`w-6 h-6 rounded-full ${COLOR_SWATCH[color]} ${newTypeColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`} />
+                        <span className={`text-[10px] font-medium ${newTypeColor === color ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+                          {label}
                         </span>
                       </button>
                     ))}
