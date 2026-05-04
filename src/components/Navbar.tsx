@@ -35,7 +35,9 @@ export default function Sidebar() {
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const todayBookingCount = isLecturer && currentLecturer
     ? getLecturerBookings(currentLecturer.name).filter(b => b.status === 'confirmed' && b.date === todayStr).length
-    : bookings.filter(b => b.status === 'confirmed' && b.date === todayStr).length
+    : (isAdmin || isSuperAdmin)
+      ? bookings.filter(b => b.status === 'confirmed' && b.date === todayStr).length
+      : 0
 
   const sidebarContent = (
     <>
