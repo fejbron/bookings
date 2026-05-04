@@ -73,17 +73,6 @@ export default function Dashboard() {
     return list.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
   }, [bookings, filter, search, dateFrom, dateTo, today])
 
-  // Group by month
-  const grouped = useMemo(() => {
-    const groups: Record<string, typeof filtered> = {}
-    for (const booking of filtered) {
-      const monthKey = format(parseISO(booking.date), 'MMMM yyyy')
-      if (!groups[monthKey]) groups[monthKey] = []
-      groups[monthKey].push(booking)
-    }
-    return groups
-  }, [filtered])
-
   const availableSlotsForReschedule = useMemo(() => {
     if (!rescheduleDate || !rescheduleModal) return []
     return getAvailableSlots(rescheduleDate)
@@ -186,6 +175,9 @@ export default function Dashboard() {
     { key: 'cancelled', label: 'Cancelled' },
   ]
 
+  // Collapse past bookings on status tabs
+  const [showPast, setShowPast] = useState(false)
+
   // Detail panel state
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
@@ -265,7 +257,7 @@ export default function Dashboard() {
               {tabs.map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => setFilter(tab.key)}
+                  onClick={() => { setFilter(tab.key); setShowPast(false) }}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     filter === tab.key
                       ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
@@ -314,72 +306,122 @@ export default function Dashboard() {
             </div>
 
             {/* Bookings List */}
-            {filtered.length === 0 ? (
-              <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
-                <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                <p className="text-sm text-[var(--text-muted)]">
-                  {bookings.length === 0 ? 'No bookings yet. Students will appear here once they book.' : 'No bookings match your filters.'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {Object.entries(grouped).map(([month, items]) => (
-                  <div key={month}>
-                    <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">{month}</h3>
-                    <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden" style={{ boxShadow: 'var(--card-shadow)' }}>
-                      {items.map((booking, i) => {
-                        const isSelected = selectedBooking?.id === booking.id
-                        return (
-                          <div
-                            key={booking.id}
-                            onClick={() => setSelectedBooking(isSelected ? null : booking)}
-                            className={`flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-colors animate-fade-in-up ${
-                              i !== 0 ? 'border-t border-[var(--border)]' : ''
-                            } ${isSelected ? 'bg-[var(--accent-light)]' : 'hover:bg-gray-50'} ${
-                              booking.status === 'cancelled' ? 'opacity-50' : ''
-                            }`}
-                            style={{
-                              borderLeft: `3px solid ${statusBorderColor(booking.status)}`,
-                              animationDelay: `${Math.min(i * 20, 150)}ms`,
-                            }}
-                          >
-                            {/* Date block */}
-                            <div className="text-center shrink-0 w-11">
-                              <div className="text-[10px] font-bold uppercase text-[var(--text-muted)]">
-                                {format(parseISO(booking.date), 'EEE')}
-                              </div>
-                              <div className="text-xl font-bold text-[var(--text-primary)] leading-tight">
-                                {format(parseISO(booking.date), 'dd')}
-                              </div>
-                            </div>
+            {(() => {
+              // On status tabs (not 'upcoming'), split into future and past
+              const isStatusTab = filter !== 'upcoming'
+              const upcomingFiltered = isStatusTab ? filtered.filter(b => b.date >= today) : filtered
+              const pastFiltered = isStatusTab ? filtered.filter(b => b.date < today) : []
 
-                            {/* Divider */}
-                            <div className="w-px h-9 bg-[var(--border)] shrink-0" />
+              function groupByMonth(list: typeof filtered) {
+                const groups: Record<string, typeof filtered> = {}
+                for (const b of list) {
+                  const key = format(parseISO(b.date), 'MMMM yyyy')
+                  if (!groups[key]) groups[key] = []
+                  groups[key].push(b)
+                }
+                return groups
+              }
 
-                            {/* Time */}
-                            <div className="shrink-0 w-24">
-                              <div className="text-sm font-semibold text-[var(--text-primary)]">{formatTime(booking.time)}</div>
-                              <div className="text-xs text-[var(--text-muted)]">{booking.duration} min</div>
-                            </div>
-
-                            {/* Details */}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
-                              <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName}</p>
-                            </div>
-
-                            {/* Status badge */}
-                            <div className="shrink-0">
-                              <StatusBadge status={booking.status} />
-                            </div>
-                          </div>
-                        )
-                      })}
+              function BookingRow({ booking, i }: { booking: typeof filtered[0]; i: number }) {
+                const isSelected = selectedBooking?.id === booking.id
+                return (
+                  <div
+                    key={booking.id}
+                    onClick={() => setSelectedBooking(isSelected ? null : booking)}
+                    className={`flex items-center gap-4 px-4 py-3.5 cursor-pointer transition-colors animate-fade-in-up ${
+                      i !== 0 ? 'border-t border-[var(--border)]' : ''
+                    } ${isSelected ? 'bg-[var(--accent-light)]' : 'hover:bg-gray-50'} ${
+                      booking.status === 'cancelled' ? 'opacity-50' : ''
+                    }`}
+                    style={{
+                      borderLeft: `3px solid ${statusBorderColor(booking.status)}`,
+                      animationDelay: `${Math.min(i * 20, 150)}ms`,
+                    }}
+                  >
+                    <div className="text-center shrink-0 w-11">
+                      <div className="text-[10px] font-bold uppercase text-[var(--text-muted)]">
+                        {format(parseISO(booking.date), 'EEE')}
+                      </div>
+                      <div className="text-xl font-bold text-[var(--text-primary)] leading-tight">
+                        {format(parseISO(booking.date), 'dd')}
+                      </div>
+                    </div>
+                    <div className="w-px h-9 bg-[var(--border)] shrink-0" />
+                    <div className="shrink-0 w-24">
+                      <div className="text-sm font-semibold text-[var(--text-primary)]">{formatTime(booking.time)}</div>
+                      <div className="text-xs text-[var(--text-muted)]">{booking.duration} min</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName}</p>
+                    </div>
+                    <div className="shrink-0">
+                      <StatusBadge status={booking.status} />
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                )
+              }
+
+              function MonthGroup({ month, items }: { month: string; items: typeof filtered }) {
+                return (
+                  <div>
+                    <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">{month}</h3>
+                    <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden" style={{ boxShadow: 'var(--card-shadow)' }}>
+                      {items.map((booking, i) => <BookingRow key={booking.id} booking={booking} i={i} />)}
+                    </div>
+                  </div>
+                )
+              }
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
+                    <AlertCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                    <p className="text-sm text-[var(--text-muted)]">
+                      {bookings.length === 0 ? 'No bookings yet. Students will appear here once they book.' : 'No bookings match your filters.'}
+                    </p>
+                  </div>
+                )
+              }
+
+              const upcomingGroups = groupByMonth(upcomingFiltered)
+              const pastGroups = groupByMonth(pastFiltered)
+
+              return (
+                <div className="space-y-8">
+                  {/* Upcoming / all entries */}
+                  {upcomingFiltered.length === 0 && isStatusTab ? (
+                    <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center">
+                      <p className="text-sm text-[var(--text-muted)]">No upcoming bookings in this category.</p>
+                    </div>
+                  ) : (
+                    Object.entries(upcomingGroups).map(([month, items]) => (
+                      <MonthGroup key={month} month={month} items={items} />
+                    ))
+                  )}
+
+                  {/* Past bookings toggle — only on status tabs */}
+                  {isStatusTab && pastFiltered.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowPast(p => !p)}
+                        className="flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors mb-3 group"
+                      >
+                        <span className={`transition-transform duration-200 ${showPast ? 'rotate-90' : ''}`}>▶</span>
+                        {showPast ? 'Hide' : 'Show'} {pastFiltered.length} past booking{pastFiltered.length !== 1 ? 's' : ''}
+                      </button>
+                      {showPast && (
+                        <div className="space-y-8 animate-fade-in">
+                          {Object.entries(pastGroups).map(([month, items]) => (
+                            <MonthGroup key={month} month={month} items={items} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Right column — Detail panel */}
