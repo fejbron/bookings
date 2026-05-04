@@ -175,8 +175,17 @@ export default function Dashboard() {
     { key: 'cancelled', label: 'Cancelled' },
   ]
 
-  // Collapse past bookings on status tabs
-  const [showPast, setShowPast] = useState(false)
+  // Collapse past bookings on status tabs — tracks which past months are expanded
+  const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string>>(new Set())
+
+  function togglePastMonth(month: string) {
+    setExpandedPastMonths(prev => {
+      const next = new Set(prev)
+      if (next.has(month)) next.delete(month)
+      else next.add(month)
+      return next
+    })
+  }
 
   // Detail panel state
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -257,7 +266,7 @@ export default function Dashboard() {
               {tabs.map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => { setFilter(tab.key); setShowPast(false) }}
+                  onClick={() => { setFilter(tab.key); setExpandedPastMonths(new Set()) }}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     filter === tab.key
                       ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
@@ -400,23 +409,37 @@ export default function Dashboard() {
                     ))
                   )}
 
-                  {/* Past bookings toggle — only on status tabs */}
+                  {/* Past bookings — per-month accordion, only on status tabs */}
                   {isStatusTab && pastFiltered.length > 0 && (
-                    <div>
-                      <button
-                        onClick={() => setShowPast(p => !p)}
-                        className="flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-secondary)] transition-colors mb-3 group"
-                      >
-                        <span className={`transition-transform duration-200 ${showPast ? 'rotate-90' : ''}`}>▶</span>
-                        {showPast ? 'Hide' : 'Show'} {pastFiltered.length} past booking{pastFiltered.length !== 1 ? 's' : ''}
-                      </button>
-                      {showPast && (
-                        <div className="space-y-8 animate-fade-in">
-                          {Object.entries(pastGroups).map(([month, items]) => (
-                            <MonthGroup key={month} month={month} items={items} />
-                          ))}
-                        </div>
-                      )}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+                        Past · {pastFiltered.length} booking{pastFiltered.length !== 1 ? 's' : ''}
+                      </p>
+                      {Object.entries(pastGroups).reverse().map(([month, items]) => {
+                        const isOpen = expandedPastMonths.has(month)
+                        return (
+                          <div key={month}>
+                            <button
+                              onClick={() => togglePastMonth(month)}
+                              className="w-full flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-[var(--border)] hover:bg-gray-50 transition-colors"
+                              style={{ boxShadow: 'var(--card-shadow)' }}
+                            >
+                              <span className="text-sm font-medium text-[var(--text-secondary)]">{month}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-[var(--text-muted)]">{items.length} booking{items.length !== 1 ? 's' : ''}</span>
+                                <span className={`text-[var(--text-muted)] text-xs transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                              </div>
+                            </button>
+                            {isOpen && (
+                              <div className="mt-1.5 animate-fade-in">
+                                <div className="bg-white rounded-xl border border-[var(--border)] overflow-hidden" style={{ boxShadow: 'var(--card-shadow)' }}>
+                                  {items.map((booking, i) => <BookingRow key={booking.id} booking={booking} i={i} />)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
