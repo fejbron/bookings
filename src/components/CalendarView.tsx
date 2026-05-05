@@ -236,11 +236,11 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
         key={key}
         className={`flex-1 relative border-l border-[var(--border)] ${highlight ? 'bg-blue-50/20' : ''}`}
       >
-        {/* Hour lines */}
+        {/* Hour lines — pointer-events-none so they never intercept booking clicks */}
         {HOURS.map(h => (
           <div
             key={h}
-            className="absolute w-full border-t border-[var(--border)]"
+            className="absolute w-full border-t border-[var(--border)] pointer-events-none"
             style={{ top: minToPx((h - START_HOUR) * 60) }}
           />
         ))}
@@ -248,7 +248,7 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
         {HOURS.slice(0, -1).map(h => (
           <div
             key={`${h}h`}
-            className="absolute w-full border-t border-dashed border-gray-100"
+            className="absolute w-full border-t border-dashed border-gray-100 pointer-events-none"
             style={{ top: minToPx((h - START_HOUR) * 60 + 30) }}
           />
         ))}

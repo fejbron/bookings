@@ -258,13 +258,13 @@ export default function Dashboard() {
               {/* List / Calendar toggle */}
               <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden">
                 <button
-                  onClick={() => setPageView('list')}
+                  onClick={() => { setPageView('list'); setSelectedBooking(null) }}
                   className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${pageView === 'list' ? 'bg-[var(--text-primary)] text-white' : 'text-[var(--text-muted)] hover:bg-gray-50'}`}
                 >
                   <LayoutList className="w-3.5 h-3.5" /> List
                 </button>
                 <button
-                  onClick={() => setPageView('calendar')}
+                  onClick={() => { setPageView('calendar'); setSelectedBooking(null) }}
                   className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${pageView === 'calendar' ? 'bg-[var(--text-primary)] text-white' : 'text-[var(--text-muted)] hover:bg-gray-50'}`}
                 >
                   <CalendarDays className="w-3.5 h-3.5" /> Calendar
