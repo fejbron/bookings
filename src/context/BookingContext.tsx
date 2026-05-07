@@ -94,7 +94,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         supabase.from('slot_configs').select('*').order('created_at', { ascending: false }),
         supabase.from('admin_settings').select('*').eq('id', 1).single(),
         supabase.from('calendar_types').select('*').order('created_at'),
-        supabase.from('lecturer_profiles').select('id, name, email, class_group, description, created_at').order('created_at'),
+        supabase.from('lecturer_profiles').select('*').order('created_at'),
       ])
       if (slotsRes.data) setSlots(slotsRes.data.map(toSlot))
       if (bookingsRes.data) setBookings(bookingsRes.data.map(toBooking))
