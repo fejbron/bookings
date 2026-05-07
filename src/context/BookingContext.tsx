@@ -35,7 +35,7 @@ interface BookingContextType {
   bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }, initialStatus?: 'pending' | 'confirmed') => Promise<Booking>
   confirmBooking: (id: string) => Promise<void>
   getStudentBookings: (email: string) => Booking[]
-  cancelBooking: (id: string) => Promise<void>
+  cancelBooking: (id: string, reason?: string) => Promise<void>
 
   rescheduleBooking: (bookingId: string, newSlotId: string) => Promise<void>
   addAdminComment: (bookingId: string, comment: string) => Promise<void>
@@ -57,7 +57,7 @@ function toSlot(r: any): PresentationSlot {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', createdAt: r.created_at }
+  return { id: r.id, slotId: r.slot_id, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', createdAt: r.created_at }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -272,9 +272,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return bookings.filter(b => b.studentEmail.toLowerCase() === email.toLowerCase())
   }, [bookings])
 
-  const cancelBooking = useCallback(async (id: string) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id)
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b))
+  const cancelBooking = useCallback(async (id: string, reason?: string) => {
+    await supabase.from('bookings').update({ status: 'cancelled', cancellation_reason: reason?.trim() || null }).eq('id', id)
+    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const, cancellationReason: reason?.trim() ?? '' } : b))
   }, [])
 
   const confirmBooking = useCallback(async (id: string) => {

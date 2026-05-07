@@ -10,6 +10,7 @@ export default function MyBookings() {
   const [email, setEmail] = useState('')
   const [submittedEmail, setSubmittedEmail] = useState('')
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
   const [activeTab, setActiveTab] = useState<'upcoming' | 'cancelled'>('upcoming')
 
   const bookings = useMemo(
@@ -25,8 +26,14 @@ export default function MyBookings() {
   }
 
   async function handleCancel(id: string) {
-    await cancelBooking(id)
+    await cancelBooking(id, cancelReason)
     setCancelConfirmId(null)
+    setCancelReason('')
+  }
+
+  function openCancel(id: string) {
+    setCancelConfirmId(id)
+    setCancelReason('')
   }
 
   function getCountdown(dateStr: string, timeStr: string): string | null {
@@ -125,10 +132,9 @@ export default function MyBookings() {
                 const completed = booking.status === 'confirmed' && isCompleted(booking.date, booking.time, booking.duration)
 
                 return (
+                  <div key={booking.id} style={{ animationDelay: `${i * 40}ms` }}>
                   <div
-                    key={booking.id}
                     className={`bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 flex items-center gap-5 hover:shadow-sm transition-shadow animate-fade-in-up ${isCancelled ? 'opacity-50' : ''}`}
-                    style={{ animationDelay: `${i * 40}ms` }}
                   >
                     {/* Date block */}
                     <div className="text-center shrink-0 w-12">
@@ -191,25 +197,47 @@ export default function MyBookings() {
                       </div>
                     </div>
 
-                    {/* Cancel */}
-                    {!isCancelled && !completed && adminSettings.allowSelfCancel && (
-                      cancelConfirmId === booking.id ? (
-                        <div className="shrink-0 flex flex-col items-end gap-1 animate-scale-in">
-                          <span className="text-xs text-red-500 font-medium">Cancel?</span>
-                          <div className="flex gap-1">
-                            <button onClick={() => handleCancel(booking.id)} className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
-                            <button onClick={() => setCancelConfirmId(null)} className="px-2 py-0.5 rounded text-xs font-medium text-[var(--text-secondary)] hover:bg-gray-100 transition-colors">No</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setCancelConfirmId(booking.id)}
-                          className="shrink-0 p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )
+                    {/* Cancel button */}
+                    {!isCancelled && !completed && adminSettings.allowSelfCancel && cancelConfirmId !== booking.id && (
+                      <button
+                        onClick={() => openCancel(booking.id)}
+                        className="shrink-0 p-2 rounded-lg text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Cancel booking"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     )}
+                  </div>
+
+                  {/* Cancel reason panel */}
+                  {cancelConfirmId === booking.id && !isCancelled && !completed && adminSettings.allowSelfCancel && (
+                    <div className="mt-2 bg-red-50 border border-red-100 rounded-2xl p-4 animate-fade-in">
+                      <p className="text-sm font-semibold text-red-700 mb-2">Cancel this booking?</p>
+                      <textarea
+                        value={cancelReason}
+                        onChange={e => setCancelReason(e.target.value)}
+                        rows={2}
+                        maxLength={300}
+                        placeholder="Reason for cancelling (optional)"
+                        autoFocus
+                        className="w-full px-3 py-2 rounded-xl border border-red-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none transition"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => handleCancel(booking.id)}
+                          className="flex-1 bg-red-600 text-white py-2 rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors"
+                        >
+                          Confirm cancellation
+                        </button>
+                        <button
+                          onClick={() => { setCancelConfirmId(null); setCancelReason('') }}
+                          className="px-4 py-2 rounded-xl border border-red-200 text-sm font-medium text-gray-600 hover:bg-red-100 transition-colors"
+                        >
+                          Keep booking
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 )
               })}

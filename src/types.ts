@@ -3,6 +3,7 @@ export interface LecturerProfile {
   name: string
   email: string
   classGroup?: string
+  description?: string
   createdAt: string
 }
 
@@ -10,6 +11,7 @@ export interface CalendarTypeRecord {
   id: string
   name: string
   color: string
+  description?: string
   createdAt: string
 }
 
@@ -54,5 +56,6 @@ export interface Booking {
   notes: string
   status: 'pending' | 'confirmed' | 'cancelled'
   adminComment: string
+  cancellationReason: string
   createdAt: string
 }
