@@ -99,16 +99,15 @@ export default function Lecturers() {
         <div className="mb-8 animate-fade-in-up">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-                <Users className="w-6 h-6 text-[var(--accent)]" />
-                Lecturers
+              <h1 className="text-xl font-bold text-gray-900">
+                Team
               </h1>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">Manage lecturer accounts. Lecturers can view and manage bookings for their own slots.</p>
+              <p className="mt-0.5 text-sm text-gray-500">Manage lecturer accounts and their booking access.</p>
             </div>
             {!showForm && (
               <button
                 onClick={() => setShowForm(true)}
-                className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
               >
                 <Plus className="w-4 h-4" /> Add Lecturer
               </button>
@@ -236,7 +235,7 @@ export default function Lecturers() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

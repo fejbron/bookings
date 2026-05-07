@@ -197,7 +197,6 @@ export default function CalendarView({ bookings, slots, calendarTypeRecords, onS
           left:  `${leftPct}%`,
           width: `${widthPct}%`,
           borderLeft: `3px solid ${c.border}`,
-          ringColor: c.border,
         }}
       >
         <div className="px-1.5 py-1 h-full flex flex-col overflow-hidden">

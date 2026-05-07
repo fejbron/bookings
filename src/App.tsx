@@ -13,6 +13,9 @@ import Dashboard from './pages/admin/Dashboard'
 import ManageSlots from './pages/admin/ManageSlots'
 import Settings from './pages/admin/Settings'
 import Lecturers from './pages/admin/Lecturers'
+import EventTypes from './pages/admin/EventTypes'
+import Availability from './pages/admin/Availability'
+import Analytics from './pages/admin/Analytics'
 import LecturerDashboard from './pages/lecturer/Dashboard'
 
 export default function App() {
@@ -35,6 +38,30 @@ export default function App() {
                   element={
                     <AdminGuard>
                       <Dashboard />
+                    </AdminGuard>
+                  }
+                />
+                <Route
+                  path="/admin/event-types"
+                  element={
+                    <AdminGuard>
+                      <EventTypes />
+                    </AdminGuard>
+                  }
+                />
+                <Route
+                  path="/admin/availability"
+                  element={
+                    <AdminGuard>
+                      <Availability />
+                    </AdminGuard>
+                  }
+                />
+                <Route
+                  path="/admin/analytics"
+                  element={
+                    <AdminGuard>
+                      <Analytics />
                     </AdminGuard>
                   }
                 />

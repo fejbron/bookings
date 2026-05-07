@@ -116,6 +116,15 @@ export default function Dashboard() {
     return getAvailableSlots(nbDate)
   }, [nbDate, getAvailableSlots])
 
+  const TOPIC_HIDDEN_TYPES = ['Office Meeting', 'Other', 'Personal']
+
+  const nbSlotType = useMemo(() => {
+    if (!nbSlotId) return null
+    return availableSlotsForNewBooking.find(s => s.id === nbSlotId)?.calendarType ?? null
+  }, [nbSlotId, availableSlotsForNewBooking])
+
+  const nbTopicHidden = TOPIC_HIDDEN_TYPES.includes(nbSlotType ?? '')
+
   function openNewBooking() {
     setNewBookingOpen(true)
     setNbDate(''); setNbSlotId(''); setNbName(''); setNbEmail('')
@@ -130,7 +139,7 @@ export default function Dashboard() {
     if (!nbName.trim()) errs.name = 'Full name is required.'
     if (!nbEmail.trim()) errs.email = 'Email is required.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nbEmail.trim())) errs.email = 'Enter a valid email.'
-    if (!nbTopic.trim()) errs.topic = 'Presentation topic is required.'
+    if (!nbTopicHidden && !nbTopic.trim()) errs.topic = 'Presentation topic is required.'
     setNbErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -143,7 +152,7 @@ export default function Dashboard() {
       await bookSlot(nbSlotId, {
         studentName: nbName.trim(),
         studentEmail: nbEmail.trim(),
-        presentationTopic: nbTopic.trim(),
+        presentationTopic: nbTopicHidden ? (nbSlotType ?? 'Meeting') : nbTopic.trim(),
         notes: nbNotes.trim(),
       })
       setNewBookingOpen(false)
@@ -245,14 +254,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--bg-page)]">
       <div className={`mx-auto px-6 sm:px-8 py-8 sm:py-10 transition-all duration-300 ${pageView === 'list' && selectedBooking ? 'max-w-5xl' : 'max-w-4xl'}`}>
         {/* Header */}
-        <div className="mb-8 animate-fade-in-up">
+        <div className="mb-6 animate-fade-in-up">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)]">Reservations</h1>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">{bookings.filter(b => b.status === 'confirmed' && b.date >= today).length} upcoming presentation{bookings.filter(b => b.status === 'confirmed' && b.date >= today).length !== 1 ? 's' : ''}</p>
+              <h1 className="text-xl font-bold text-gray-900">Bookings</h1>
+              <p className="mt-0.5 text-sm text-gray-500">{bookings.filter(b => b.status === 'confirmed' && b.date >= today).length} upcoming · {pendingBookings.length} pending review</p>
             </div>
             <div className="flex items-center gap-2">
               {/* List / Calendar toggle */}
@@ -273,10 +282,10 @@ export default function Dashboard() {
 
               <button
                 onClick={openNewBooking}
-                className="flex items-center gap-2 bg-[var(--accent)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                New Booking
+                New booking
               </button>
               <button
                 onClick={exportBookingsCSV}
@@ -291,15 +300,15 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-3 gap-4 mb-8 stagger-children">
+        <div className="grid grid-cols-3 gap-4 mb-6 stagger-children">
           {[
-            { label: 'Total Slots', value: totalSlots, color: 'text-[var(--text-primary)]' },
-            { label: 'Booked', value: bookedCount, color: 'text-[var(--accent)]' },
+            { label: 'Total slots', value: totalSlots, color: 'text-gray-900' },
+            { label: 'Confirmed', value: bookedCount, color: 'text-[var(--accent)]' },
             { label: 'Available', value: availableCount, color: 'text-[var(--status-confirmed)]' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-xl border border-[var(--border)] p-4" style={{ boxShadow: 'var(--card-shadow)' }}>
+            <div key={stat.label} className="stat-card">
               <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-0.5">{stat.label}</div>
+              <div className="text-xs text-gray-500 mt-0.5 font-medium">{stat.label}</div>
             </div>
           ))}
         </div>
@@ -322,15 +331,15 @@ export default function Dashboard() {
           {/* Left column — list */}
           <div className="flex-1 min-w-0">
             {/* Tabs */}
-            <div className="flex items-center gap-0 border-b border-[var(--border)] mb-6 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+            <div className="flex items-center gap-0 border-b border-gray-200 mb-6 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
               {tabs.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => { setFilter(tab.key); setExpandedPastMonths(new Set()); setCalendarTypeFilter('') }}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     filter === tab.key
-                      ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   {tab.label}
@@ -446,8 +455,20 @@ export default function Dashboard() {
                       <div className="text-xs text-[var(--text-muted)]">{booking.duration} min</div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
-                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName}</p>
+                      {(() => {
+                        const bSlot = slots.find(s => s.id === booking.slotId)
+                        const topicHidden = TOPIC_HIDDEN_TYPES.includes(bSlot?.calendarType ?? '')
+                        return (
+                          <>
+                            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                              {topicHidden ? booking.studentName : booking.presentationTopic}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                              {topicHidden ? booking.studentEmail : booking.studentName}
+                            </p>
+                          </>
+                        )
+                      })()}
                     </div>
                     <div className="shrink-0">
                       <StatusBadge status={booking.status} />
@@ -595,15 +616,21 @@ export default function Dashboard() {
                 })()}
 
                 {/* Topic */}
-                <div>
-                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Presentation Topic</p>
-                  <p className="text-sm text-[var(--text-primary)]">{selectedBooking.presentationTopic}</p>
-                </div>
+                {(() => {
+                  const bookingSlot2 = slots.find(s => s.id === selectedBooking.slotId)
+                  const topicHidden = ['Office Meeting', 'Other', 'Personal'].includes(bookingSlot2?.calendarType ?? '')
+                  return !topicHidden && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Presentation Topic</p>
+                      <p className="text-sm text-[var(--text-primary)]">{selectedBooking.presentationTopic}</p>
+                    </div>
+                  )
+                })()}
 
                 {/* Notes */}
                 {selectedBooking.notes && (
                   <div>
-                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Student Notes</p>
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Notes</p>
                     <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{selectedBooking.notes}</p>
                   </div>
                 )}
@@ -720,7 +747,7 @@ export default function Dashboard() {
               {[
                 { icon: User, label: 'Full Name', key: 'name', type: 'text', val: nbName, set: setNbName, placeholder: 'Jane Smith', max: 100 },
                 { icon: Mail, label: 'Email', key: 'email', type: 'email', val: nbEmail, set: setNbEmail, placeholder: 'student@example.com', max: 254 },
-                { icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: nbTopic, set: setNbTopic, placeholder: 'e.g. Final Year Project Demo', max: 200 },
+                ...(!nbTopicHidden ? [{ icon: Presentation, label: 'Presentation Topic', key: 'topic', type: 'text', val: nbTopic, set: setNbTopic, placeholder: 'e.g. Final Year Project Demo', max: 200 }] : []),
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5 flex items-center gap-1">
@@ -766,7 +793,7 @@ export default function Dashboard() {
               <button
                 onClick={handleNewBooking}
                 disabled={nbLoading}
-                className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {nbLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 Confirm Booking
@@ -976,10 +1003,14 @@ export default function Dashboard() {
               })()}
 
               {/* Topic */}
-              <div>
-                <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Presentation Topic</p>
-                <p className="text-sm text-[var(--text-primary)]">{selectedBooking.presentationTopic}</p>
-              </div>
+              {!['Office Meeting', 'Other', 'Personal'].includes(
+                slots.find(s => s.id === selectedBooking.slotId)?.calendarType ?? ''
+              ) && (
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Presentation Topic</p>
+                  <p className="text-sm text-[var(--text-primary)]">{selectedBooking.presentationTopic}</p>
+                </div>
+              )}
 
               {/* Email */}
               <div>

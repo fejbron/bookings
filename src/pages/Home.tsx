@@ -1,151 +1,180 @@
 import { Link } from 'react-router-dom'
-import { CalendarCheck, Clock, ArrowRight, Presentation, MessageSquare, CalendarDays, User, Users } from 'lucide-react'
+import { Clock, ArrowRight, CalendarDays, Globe } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
 import { format, parseISO } from 'date-fns'
 
-const steps = [
-  { icon: CalendarCheck, title: 'Pick a Date', desc: 'Browse the calendar for available presentation dates.' },
-  { icon: Clock, title: 'Choose a Time', desc: 'Select from the time slots your instructor has made available.' },
-  { icon: Presentation, title: 'Confirm Booking', desc: 'Enter your details and secure your presentation slot.' },
-]
+const COLOR_BG: Record<string, string> = {
+  blue: '#006BFF', purple: '#7C3AED', green: '#059669',
+  orange: '#EA580C', pink: '#DB2777', teal: '#0891B2', grey: '#4B5563',
+}
 
-export default function Home() {
-  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings } = useBookings()
-  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length
-  const availableCount = slots.length - confirmedCount
-  const upcomingDates = getAvailableDates().slice(0, 5)
+const COLOR_LIGHT: Record<string, string> = {
+  blue: '#EBF3FF', purple: '#EDE9FE', green: '#D1FAE5',
+  orange: '#FED7AA', pink: '#FCE7F3', teal: '#CFFAFE', grey: '#F3F4F6',
+}
 
-  const dateInfo = upcomingDates.map(date => {
-    const available = getAvailableSlots(date)
-    const lecturers = [...new Set(available.map(s => s.lecturerName).filter(Boolean))] as string[]
-    const groups = [...new Set(available.map(s => s.classGroup).filter(Boolean))] as string[]
-    return { date, count: available.length, lecturers, groups }
-  })
+function EventTypeCard({ name, color, count }: { name: string; color: string; count: number }) {
+  const bg = COLOR_BG[color] ?? '#4B5563'
+  const light = COLOR_LIGHT[color] ?? '#F3F4F6'
 
   return (
-    <div className="min-h-screen">
-      {/* Hero */}
-      <section className="bg-white border-b border-[var(--border)]">
-        <div className="max-w-4xl mx-auto px-6 sm:px-8 py-16 sm:py-20">
-          <div className="animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 bg-[var(--accent-light)] text-[var(--accent)] text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
-              <Presentation className="w-3.5 h-3.5" />
-              Student Presentation Booking
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] tracking-tight leading-tight">
-              Book your<br />
-              <span className="text-[var(--accent)]">presentation slot</span>
-            </h1>
-            <p className="mt-4 text-base text-[var(--text-secondary)] max-w-lg leading-relaxed">
-              Reserve your presentation time in seconds. Pick an available date, choose your slot, and confirm.
+    <Link
+      to={`/book?type=${encodeURIComponent(name)}`}
+      className="group block bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all"
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <div
+            className="w-2 h-2 rounded-full mb-3"
+            style={{ background: bg }}
+          />
+          <h3 className="text-[15px] font-semibold text-gray-900">{name}</h3>
+          <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-500">
+            <Clock style={{ width: 13, height: 13 }} />
+            <span>{count > 0 ? `${count} slot${count !== 1 ? 's' : ''} available` : 'No slots yet'}</span>
+          </div>
+        </div>
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform"
+          style={{ background: light }}
+        >
+          <ArrowRight style={{ width: 16, height: 16, color: bg }} />
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+export default function Home() {
+  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings, calendarTypeRecords } = useBookings()
+
+  const totalAvailable = slots.length - bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length
+  const upcomingDates = getAvailableDates().slice(0, 5)
+
+  function getSlotCount(typeName: string) {
+    return getAvailableDates(typeName).reduce((acc, date) => {
+      return acc + getAvailableSlots(date, typeName).length
+    }, 0)
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Profile section */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-6 py-14 text-center">
+
+          {/* Avatar */}
+          <div className="w-20 h-20 rounded-full bg-gray-900 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-5 shadow-sm">
+            BS
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-900">BookSlot</h1>
+
+          {adminSettings.welcomeMessage ? (
+            <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">
+              {adminSettings.welcomeMessage}
             </p>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">
+              Book a presentation slot directly. Pick a time that works for you.
+            </p>
+          )}
 
-            {availableCount > 0 && (
-              <p className="mt-3 text-sm text-[var(--text-muted)]">
-                <span className="font-semibold text-[var(--text-primary)]">{availableCount}</span>{' '}
-                slot{availableCount !== 1 ? 's' : ''} currently available
-              </p>
+          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-gray-400">
+            <span className="flex items-center gap-1">
+              <Globe style={{ width: 11, height: 11 }} />
+              Africa/Accra
+            </span>
+            {totalAvailable > 0 && (
+              <span className="flex items-center gap-1">
+                <CalendarDays style={{ width: 11, height: 11 }} />
+                {totalAvailable} slot{totalAvailable !== 1 ? 's' : ''} available
+              </span>
             )}
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to="/book"
-                className="inline-flex items-center gap-2 bg-[var(--accent)] text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
-              >
-                Book a Slot
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/my-bookings"
-                className="inline-flex items-center gap-2 text-[var(--text-secondary)] border border-[var(--border)] px-6 py-3 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Find My Bookings
-              </Link>
-            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Admin Welcome Message */}
-      {adminSettings.welcomeMessage && (
-        <section className="max-w-4xl mx-auto px-6 sm:px-8 pt-6 animate-fade-in-up">
-          <div className="bg-[var(--accent-light)] rounded-2xl p-4 flex items-start gap-3 border border-blue-100">
-            <MessageSquare className="w-4 h-4 text-[var(--accent)] shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-primary)] font-medium">{adminSettings.welcomeMessage}</p>
+      {/* Event types */}
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
+          Available sessions
+        </p>
+
+        {calendarTypeRecords.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+            <CalendarDays style={{ width: 32, height: 32 }} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">No booking types available yet. Check back soon.</p>
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="space-y-3 stagger-children">
+            {calendarTypeRecords.map(record => (
+              <EventTypeCard
+                key={record.id}
+                name={record.name}
+                color={record.color}
+                count={getSlotCount(record.name)}
+              />
+            ))}
+          </div>
+        )}
 
-      {/* Upcoming Available Dates */}
-      {upcomingDates.length > 0 && (
-        <section className="max-w-4xl mx-auto px-6 sm:px-8 pt-6 animate-fade-in-up" style={{ animationDelay: '60ms' }}>
-          <div className="bg-white rounded-2xl border border-[var(--border)] p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-[var(--accent)]" />
-              Next Available Dates
-            </h3>
-            <div className="space-y-2">
-              {dateInfo.map(({ date, count, lecturers, groups }) => (
-                <Link
-                  key={date}
-                  to="/book"
-                  className="flex items-center gap-4 px-4 py-3 rounded-xl bg-gray-50 hover:bg-[var(--accent-light)] transition-colors border border-transparent hover:border-blue-100 group"
-                >
-                  <div className="shrink-0 text-center w-10">
-                    <div className="text-[10px] font-bold uppercase text-[var(--accent)]">{format(parseISO(date), 'EEE')}</div>
-                    <div className="text-xl font-bold text-[var(--text-primary)] leading-tight">{format(parseISO(date), 'd')}</div>
-                    <div className="text-[10px] text-[var(--text-muted)]">{format(parseISO(date), 'MMM')}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {lecturers.length > 0 && (
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-primary)]">
-                          <User className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                          {lecturers.join(', ')}
-                        </span>
-                      )}
-                      {groups.length > 0 && (
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-primary)]">
-                          <Users className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                          {groups.join(', ')}
-                        </span>
-                      )}
+        {/* Upcoming available dates */}
+        {upcomingDates.length > 0 && (
+          <div className="mt-8">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
+              Upcoming availability
+            </p>
+            <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-50 overflow-hidden">
+              {upcomingDates.map(date => {
+                const available = getAvailableSlots(date)
+                return (
+                  <Link
+                    key={date}
+                    to="/book"
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors group"
+                  >
+                    <div className="text-center w-10 flex-shrink-0">
+                      <div className="text-[10px] font-bold uppercase text-gray-400">
+                        {format(parseISO(date), 'EEE')}
+                      </div>
+                      <div className="text-lg font-bold text-gray-900 leading-tight">
+                        {format(parseISO(date), 'd')}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {format(parseISO(date), 'MMM')}
+                      </div>
                     </div>
-                    <div className="text-xs text-[var(--text-muted)] mt-0.5">{count} slot{count !== 1 ? 's' : ''} available</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--accent)] shrink-0 transition-colors" />
-                </Link>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-600">
+                        {available.length} slot{available.length !== 1 ? 's' : ''} available
+                      </p>
+                    </div>
+                    <ArrowRight
+                      style={{ width: 15, height: 15 }}
+                      className="text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0"
+                    />
+                  </Link>
+                )
+              })}
             </div>
           </div>
-        </section>
-      )}
+        )}
 
-      {/* How It Works */}
-      <section className="max-w-4xl mx-auto px-6 sm:px-8 py-16">
-        <div className="mb-10 animate-fade-in-up">
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">How It Works</h2>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Three simple steps to reserve your presentation time.</p>
+        {/* My bookings link */}
+        <div className="mt-6 text-center">
+          <Link
+            to="/my-bookings"
+            className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            Already booked? View my bookings →
+          </Link>
         </div>
-        <div className="grid md:grid-cols-3 gap-5 stagger-children">
-          {steps.map((step, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[var(--border)] p-6 hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center mb-4">
-                <step.icon className="w-5 h-5" />
-              </div>
-              <div className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest mb-2">
-                Step {i + 1}
-              </div>
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{step.title}</h3>
-              <p className="mt-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">{step.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      </div>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)] text-[var(--text-muted)] text-xs text-center py-6 px-4">
-        <p>&copy; {new Date().getFullYear()} BookSlot &middot; Presentation Scheduling</p>
+      <footer className="text-center py-8 text-xs text-gray-400 border-t border-gray-100 mt-4">
+        <p>Powered by <span className="font-semibold text-gray-600">BookSlot</span></p>
       </footer>
     </div>
   )

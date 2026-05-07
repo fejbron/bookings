@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { formatTime } from '../../components/TimeSlots'
 import type { CalendarTypeRecord } from '../../types'
 
-export default function ManageSlots() {
+export default function ManageSlots({ embedded = false }: { embedded?: boolean }) {
   const { slots, bookings, slotConfigs, calendarTypeRecords, generateSlots, removeSlot, clearAllSlots, addCalendarType, deleteCalendarType } = useBookings()
   const { lecturers, loadLecturers } = useAuth()
 
@@ -173,8 +173,8 @@ export default function ManageSlots() {
   const fieldCls = "w-full px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition bg-white"
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-4xl mx-auto px-6 sm:px-8 py-8 sm:py-10">
+    <div className={embedded ? '' : 'min-h-screen bg-[var(--bg-page)]'}>
+      <div className={embedded ? '' : 'max-w-4xl mx-auto px-6 sm:px-8 py-8 sm:py-10'}>
 
         {/* Header */}
         <div className="mb-8 animate-fade-in-up">

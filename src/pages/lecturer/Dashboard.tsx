@@ -10,7 +10,12 @@ type MainTab = 'bookings' | 'availability'
 type BookingFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function LecturerDashboard() {
-  const { bookings, getLecturerBookings, getLecturerSlots, cancelBooking, confirmBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot, bookSlot, adminSettings } = useBookings()
+  const { slots, bookings, getLecturerBookings, getLecturerSlots, cancelBooking, confirmBooking, rescheduleBooking, addAdminComment, getAvailableSlots, generateSlots, removeSlot, bookSlot } = useBookings()
+
+  const TOPIC_HIDDEN_TYPES = ['Office Meeting', 'Other', 'Personal']
+  function isTopicHiddenForBooking(b: { slotId: string }) {
+    return TOPIC_HIDDEN_TYPES.includes(slots.find(s => s.id === b.slotId)?.calendarType ?? '')
+  }
   const { currentLecturer } = useAuth()
 
   const [mainTab, setMainTab] = useState<MainTab>('bookings')
@@ -438,8 +443,12 @@ export default function LecturerDashboard() {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
-                              <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
+                              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                                {isTopicHiddenForBooking(booking) ? booking.studentName : booking.presentationTopic}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                                {isTopicHiddenForBooking(booking) ? booking.studentEmail : `${booking.studentName} · ${booking.studentEmail}`}
+                              </p>
                             </div>
                             <div className="shrink-0 flex items-center gap-1">
                               <button
@@ -555,8 +564,12 @@ export default function LecturerDashboard() {
                                       </div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{booking.presentationTopic}</p>
-                                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{booking.studentName} · {booking.studentEmail}</p>
+                                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                                        {isTopicHiddenForBooking(booking) ? booking.studentName : booking.presentationTopic}
+                                      </p>
+                                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                                        {isTopicHiddenForBooking(booking) ? booking.studentEmail : `${booking.studentName} · ${booking.studentEmail}`}
+                                      </p>
                                     </div>
                                     <div className="shrink-0 flex items-center gap-1">
                                       <button

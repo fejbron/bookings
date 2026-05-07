@@ -48,49 +48,49 @@ export default function MyBookings() {
   const displayList = activeTab === 'upcoming' ? activeBookings : cancelledBookings
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-6 sm:px-8 py-8 sm:py-10">
 
         {/* Header */}
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">My Bookings</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">Enter your student email to view your presentation slots.</p>
+        <div className="mb-6 animate-fade-in-up">
+          <h1 className="text-xl font-bold text-gray-900">My Bookings</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Enter your email to view your booked sessions.</p>
         </div>
 
         {/* Email lookup */}
-        <form onSubmit={handleLookup} className="bg-white rounded-xl border border-[var(--border)] p-4 mb-6 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
+        <form onSubmit={handleLookup} className="bg-white rounded-2xl border border-gray-200 p-4 mb-6 animate-fade-in-up shadow-sm" style={{ animationDelay: '40ms' }}>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="student@school.edu"
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent"
+                placeholder="you@example.com"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
             <button
               type="submit"
               disabled={!email.trim()}
-              className="bg-[var(--accent)] text-white px-5 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-gray-900 text-white px-5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Search
+              Find bookings
             </button>
           </div>
         </form>
 
         {/* No bookings */}
         {submittedEmail && bookings.length === 0 && (
-          <div className="bg-white rounded-xl border border-[var(--border)] p-12 text-center animate-fade-in">
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center animate-fade-in">
             <Inbox className="w-10 h-10 text-gray-200 mx-auto mb-4" />
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">No bookings found</h2>
-            <p className="mt-1.5 text-sm text-[var(--text-muted)]">No bookings match <span className="font-medium text-[var(--text-primary)]">{submittedEmail}</span>.</p>
+            <h2 className="text-base font-semibold text-gray-900">No bookings found</h2>
+            <p className="mt-1.5 text-sm text-gray-500">No bookings for <span className="font-medium text-gray-900">{submittedEmail}</span>.</p>
             <Link
               to="/book"
-              className="mt-6 inline-flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors"
+              className="mt-6 inline-flex items-center gap-2 bg-gray-900 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors"
             >
-              Book a Slot <ArrowRight className="w-4 h-4" />
+              Book a session <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         )}
@@ -99,7 +99,7 @@ export default function MyBookings() {
         {bookings.length > 0 && (
           <>
             {/* Tabs */}
-            <div className="flex items-center border-b border-[var(--border)] mb-6">
+            <div className="flex items-center border-b border-gray-200 mb-6">
               {[
                 { key: 'upcoming' as const, label: `Upcoming (${activeBookings.length})` },
                 { key: 'cancelled' as const, label: `Cancelled (${cancelledBookings.length})` },
@@ -109,8 +109,8 @@ export default function MyBookings() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     activeTab === tab.key
-                      ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   {tab.label}
@@ -127,37 +127,40 @@ export default function MyBookings() {
                 return (
                   <div
                     key={booking.id}
-                    className={`bg-white rounded-xl border border-[var(--border)] p-4 sm:p-5 flex items-center gap-5 hover:shadow-sm transition-shadow animate-fade-in-up ${isCancelled ? 'opacity-60' : ''}`}
+                    className={`bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 flex items-center gap-5 hover:shadow-sm transition-shadow animate-fade-in-up ${isCancelled ? 'opacity-50' : ''}`}
                     style={{ animationDelay: `${i * 40}ms` }}
                   >
                     {/* Date block */}
                     <div className="text-center shrink-0 w-12">
-                      <div className={`text-xs font-semibold uppercase ${isCancelled ? 'text-[var(--text-muted)]' : completed ? 'text-emerald-500' : 'text-[var(--accent)]'}`}>
+                      <div className={`text-[10px] font-bold uppercase ${isCancelled ? 'text-gray-400' : completed ? 'text-emerald-500' : 'text-gray-500'}`}>
                         {format(parseISO(booking.date), 'EEE')}
                       </div>
-                      <div className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+                      <div className="text-2xl font-bold text-gray-900 leading-tight">
                         {format(parseISO(booking.date), 'dd')}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        {format(parseISO(booking.date), 'MMM')}
                       </div>
                     </div>
 
-                    <div className="w-px h-10 bg-[var(--border)] shrink-0" />
+                    <div className="w-px h-10 bg-gray-100 shrink-0" />
 
                     {/* Time */}
                     <div className="shrink-0 space-y-1">
-                      <div className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
-                        <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                        <span className="font-medium">{formatTime(booking.time)}</span>
-                        <span className="text-[var(--text-muted)]">· {booking.duration}min</span>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="font-semibold">{formatTime(booking.time)}</span>
+                        <span className="text-gray-400">· {booking.duration}min</span>
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
                         <MapPin className="w-3 h-3" />
-                        Presentation
+                        On-site
                       </div>
                     </div>
 
                     {/* Details */}
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate ${isCancelled ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
+                      <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                         {booking.presentationTopic}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
