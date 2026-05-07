@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = session?.user ?? null
       setUser(u)
       if (u) {
-        await Promise.all([
+        await Promise.allSettled([
           loadProfile(u.id),
           loadTeam(u.id),
           loadManagedAccounts(u.email!, u.id),
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const u = session?.user ?? null
       setUser(u)
       if (u) {
-        await Promise.all([
+        await Promise.allSettled([
           loadProfile(u.id),
           loadTeam(u.id),
           loadManagedAccounts(u.email!, u.id),
