@@ -87,39 +87,40 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
     setLoading(true)
     async function load() {
-      const [slotsRes, configsRes, calTypesRes, settingsRes] = await Promise.all([
-        supabase.from('slots').select('*').eq('user_id', userId).order('date').order('time'),
-        supabase.from('slot_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('calendar_types').select('*').eq('user_id', userId).order('created_at'),
-        supabase.from('admin_settings').select('*').eq('user_id', userId).maybeSingle(),
-      ])
+      try {
+        const [slotsRes, configsRes, calTypesRes, settingsRes] = await Promise.all([
+          supabase.from('slots').select('*').eq('user_id', userId).order('date').order('time'),
+          supabase.from('slot_configs').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('calendar_types').select('*').eq('user_id', userId).order('created_at'),
+          supabase.from('admin_settings').select('*').eq('user_id', userId).maybeSingle(),
+        ])
 
-      const mySlots = (slotsRes.data ?? []).map(toSlot)
-      setSlots(mySlots)
-      setSlotConfigs((configsRes.data ?? []).map(toConfig))
-      setCalendarTypeRecords((calTypesRes.data ?? []).map(toCalendarType))
+        const mySlots = (slotsRes.data ?? []).map(toSlot)
+        setSlots(mySlots)
+        setSlotConfigs((configsRes.data ?? []).map(toConfig))
+        setCalendarTypeRecords((calTypesRes.data ?? []).map(toCalendarType))
 
-      if (settingsRes.data) {
-        setUserSettings({
-          welcomeMessage: settingsRes.data.welcome_message ?? '',
-          allowSelfCancel: settingsRes.data.allow_self_cancel ?? true,
-        })
+        if (settingsRes.data) {
+          setUserSettings({
+            welcomeMessage: settingsRes.data.welcome_message ?? '',
+            allowSelfCancel: settingsRes.data.allow_self_cancel ?? true,
+          })
+        }
+
+        if (mySlots.length > 0) {
+          const slotIds = mySlots.map(s => s.id)
+          const { data: bookingData } = await supabase
+            .from('bookings')
+            .select('*')
+            .in('slot_id', slotIds)
+            .order('created_at', { ascending: false })
+          setBookings((bookingData ?? []).map(toBooking))
+        } else {
+          setBookings([])
+        }
+      } finally {
+        setLoading(false)
       }
-
-      // Load bookings for these slots
-      if (mySlots.length > 0) {
-        const slotIds = mySlots.map(s => s.id)
-        const { data: bookingData } = await supabase
-          .from('bookings')
-          .select('*')
-          .in('slot_id', slotIds)
-          .order('created_at', { ascending: false })
-        setBookings((bookingData ?? []).map(toBooking))
-      } else {
-        setBookings([])
-      }
-
-      setLoading(false)
     }
     load()
   }, [userId, authLoading])
