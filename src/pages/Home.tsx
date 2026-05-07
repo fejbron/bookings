@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Clock, ArrowRight, CalendarDays, Globe } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
+import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
 
 const COLOR_BG: Record<string, string> = {
@@ -49,14 +51,24 @@ function EventTypeCard({ name, color, count, description }: { name: string; colo
 }
 
 export default function Home() {
-  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings, calendarTypeRecords } = useBookings()
+  const { slots, bookings, getAvailableDates, getAvailableSlots, getLecturersForType, adminSettings, calendarTypeRecords } = useBookings()
+  const { lecturers, loadLecturers } = useAuth()
+
+  useEffect(() => { loadLecturers().catch(() => {}) }, [loadLecturers])
 
   const totalAvailable = slots.length - bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length
   const upcomingDates = getAvailableDates().slice(0, 5)
+  const allLecturerNames = getLecturersForType()
 
   function getSlotCount(typeName: string) {
     return getAvailableDates(typeName).reduce((acc, date) => {
       return acc + getAvailableSlots(date, typeName).length
+    }, 0)
+  }
+
+  function getLecturerSlotCount(name: string) {
+    return getAvailableDates(undefined, name).reduce((acc, date) => {
+      return acc + getAvailableSlots(date, undefined, name).length
     }, 0)
   }
 
@@ -120,6 +132,50 @@ export default function Home() {
                 description={record.description}
               />
             ))}
+          </div>
+        )}
+
+        {/* Team */}
+        {allLecturerNames.length > 0 && (
+          <div className="mt-8">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
+              Meet the team
+            </p>
+            <div className="space-y-3">
+              {allLecturerNames.map(name => {
+                const profile = lecturers.find(l => l.name.toLowerCase() === name.toLowerCase())
+                const count = getLecturerSlotCount(name)
+                const initials = name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+                return (
+                  <Link
+                    key={name}
+                    to="/book"
+                    className="group flex items-center gap-4 bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold text-gray-900">{name}</p>
+                      {profile?.classGroup && (
+                        <p className="text-xs text-gray-400 mt-0.5">{profile.classGroup}</p>
+                      )}
+                      {profile?.description && (
+                        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed line-clamp-2">{profile.description}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-500">
+                        <Clock style={{ width: 13, height: 13 }} />
+                        <span>{count > 0 ? `${count} slot${count !== 1 ? 's' : ''} available` : 'No slots available'}</span>
+                      </div>
+                    </div>
+                    <ArrowRight
+                      style={{ width: 16, height: 16 }}
+                      className="text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0"
+                    />
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         )}
 
