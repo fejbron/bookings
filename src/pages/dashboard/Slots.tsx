@@ -291,7 +291,7 @@ export default function DashboardSlots() {
             <button onClick={() => setFilterCalendarType('')} className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${!filterCalendarType ? 'bg-[var(--text-primary)] border-[var(--text-primary)] text-white' : 'border-[var(--border)] text-[var(--text-muted)]'}`}>All</button>
             {allCalendarTypes.map(type => {
               const record = calendarTypeRecords.find(t => t.name === type)
-              const c = record?.color in COLOR_ACTIVE ? record.color : 'grey'
+              const c = record?.color && record.color in COLOR_ACTIVE ? record.color : 'grey'
               return (
                 <button key={type} onClick={() => setFilterCalendarType(type === filterCalendarType ? '' : type)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold border-2 transition-colors ${filterCalendarType === type ? COLOR_ACTIVE[c] : COLOR_IDLE[c]}`}>
