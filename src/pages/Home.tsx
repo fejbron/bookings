@@ -61,9 +61,12 @@ export default function Home() {
   }
 
   function getLecturerSlotCount(name: string) {
-    return getAvailableDates(undefined, name).reduce((acc, date) => {
-      return acc + getAvailableSlots(date, undefined, name).length
-    }, 0)
+    const lecturerDates = getAvailableDates(undefined, name)
+    if (lecturerDates.length > 0) {
+      return lecturerDates.reduce((acc, date) => acc + getAvailableSlots(date, undefined, name).length, 0)
+    }
+    // Slots not assigned per-lecturer — show total available
+    return getAvailableDates().reduce((acc, date) => acc + getAvailableSlots(date).length, 0)
   }
 
   return (
