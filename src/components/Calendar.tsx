@@ -9,11 +9,12 @@ interface CalendarProps {
   selected: Date | null
   onSelect: (date: Date) => void
   availableDates?: string[]
+  dark?: boolean
 }
 
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-export default function Calendar({ selected, onSelect, availableDates }: CalendarProps) {
+export default function Calendar({ selected, onSelect, availableDates, dark = false }: CalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const today = startOfDay(new Date())
 
@@ -24,6 +25,36 @@ export default function Calendar({ selected, onSelect, availableDates }: Calenda
   const availableSet = availableDates ? new Set(availableDates) : null
   const canGoPrev = !isBefore(startOfMonth(subMonths(currentMonth, 1)), startOfMonth(today))
 
+  const c = dark ? {
+    navHover: 'hover:bg-zinc-800',
+    navIcon: 'text-zinc-400',
+    title: 'text-white',
+    weekday: 'text-zinc-500',
+    outsideMonth: 'text-zinc-800',
+    pastDay: 'text-zinc-700',
+    selectedDay: 'bg-white text-black font-bold',
+    todayDay: 'border-2 border-white text-white font-bold',
+    availableDay: 'text-white hover:bg-zinc-800 font-semibold',
+    unavailableDay: 'text-zinc-600',
+    availableDot: 'bg-white',
+    legendText: 'text-zinc-500',
+    legendDot: 'bg-white',
+  } : {
+    navHover: 'hover:bg-gray-100',
+    navIcon: 'text-gray-600',
+    title: 'text-gray-900',
+    weekday: 'text-gray-400',
+    outsideMonth: 'text-gray-200',
+    pastDay: 'text-gray-300',
+    selectedDay: 'bg-gray-900 text-white font-bold',
+    todayDay: 'border-2 border-gray-900 text-gray-900 font-bold',
+    availableDay: 'text-gray-900 hover:bg-gray-100 font-semibold',
+    unavailableDay: 'text-gray-400',
+    availableDot: 'bg-gray-900',
+    legendText: 'text-gray-400',
+    legendDot: 'bg-gray-900',
+  }
+
   return (
     <div>
       {/* Month navigation */}
@@ -31,16 +62,16 @@ export default function Calendar({ selected, onSelect, availableDates }: Calenda
         <button
           onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
           disabled={!canGoPrev}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-20 disabled:cursor-not-allowed text-gray-600"
+          className={`p-1.5 rounded-lg ${c.navHover} transition-colors disabled:opacity-20 disabled:cursor-not-allowed ${c.navIcon}`}
         >
           <ChevronLeft style={{ width: 16, height: 16 }} />
         </button>
-        <h3 className="text-sm font-semibold text-gray-900">
+        <h3 className={`text-sm font-semibold ${c.title}`}>
           {format(currentMonth, 'MMMM yyyy')}
         </h3>
         <button
           onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+          className={`p-1.5 rounded-lg ${c.navHover} transition-colors ${c.navIcon}`}
         >
           <ChevronRight style={{ width: 16, height: 16 }} />
         </button>
@@ -49,7 +80,7 @@ export default function Calendar({ selected, onSelect, availableDates }: Calenda
       {/* Week day headers */}
       <div className="grid grid-cols-7 mb-1">
         {WEEK_DAYS.map(day => (
-          <div key={day} className="flex items-center justify-center text-[11px] font-semibold text-gray-400 py-1.5">
+          <div key={day} className={`flex items-center justify-center text-[11px] font-semibold py-1.5 ${c.weekday}`}>
             {day}
           </div>
         ))}
@@ -75,22 +106,22 @@ export default function Calendar({ selected, onSelect, availableDates }: Calenda
                 className={`
                   relative w-9 h-9 rounded-full text-sm font-medium transition-all
                   ${!isCurrentMonth
-                    ? 'text-gray-200 cursor-default'
+                    ? `${c.outsideMonth} cursor-default`
                     : disabled
-                      ? 'text-gray-300 cursor-not-allowed'
+                      ? `${c.pastDay} cursor-not-allowed`
                       : isSelected
-                        ? 'bg-gray-900 text-white font-bold'
+                        ? c.selectedDay
                         : isToday
-                          ? 'border-2 border-gray-900 text-gray-900 font-bold'
+                          ? c.todayDay
                           : isAvailable
-                            ? 'text-gray-900 hover:bg-gray-100 font-semibold'
-                            : 'text-gray-400'
+                            ? c.availableDay
+                            : c.unavailableDay
                   }
                 `}
               >
                 {format(day, 'd')}
                 {isAvailable && !isSelected && availableSet && (
-                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gray-900" />
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${c.availableDot}`} />
                 )}
               </button>
             </div>
@@ -99,8 +130,8 @@ export default function Calendar({ selected, onSelect, availableDates }: Calenda
       </div>
 
       {availableSet && (
-        <div className="mt-4 flex items-center gap-1.5 text-[11px] text-gray-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-900" />
+        <div className={`mt-4 flex items-center gap-1.5 text-[11px] ${c.legendText}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${c.legendDot}`} />
           Available dates
         </div>
       )}
