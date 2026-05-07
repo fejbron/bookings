@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Key, Check, AlertCircle, User, Shield, Globe } from 'lucide-react'
+import { Key, Check, AlertCircle, User, Shield, Globe, Mail, ExternalLink, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useBookings } from '../../context/BookingContext'
+import { saveEmailConfig, clearEmailConfig, getEmailConfig, isEmailConfigured, sendBookingConfirmationEmail } from '../../lib/email'
 
-type Tab = 'profile' | 'general' | 'security'
+type Tab = 'profile' | 'general' | 'email' | 'security'
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -27,6 +28,58 @@ export default function Settings() {
   const [timezone, setTimezone] = useState('Africa/Accra')
   const [welcomeMsg, setWelcomeMsg] = useState(adminSettings.welcomeMessage)
   const [savedProfile, setSavedProfile] = useState(false)
+
+  // Email
+  const savedCfg = getEmailConfig()
+  const [emailServiceId, setEmailServiceId]   = useState(savedCfg.serviceId)
+  const [emailTemplateId, setEmailTemplateId] = useState(savedCfg.templateId)
+  const [emailPublicKey, setEmailPublicKey]   = useState(savedCfg.publicKey)
+  const [showKey, setShowKey] = useState(false)
+  const [emailConnected, setEmailConnected] = useState(isEmailConfigured())
+  const [emailSaveMsg, setEmailSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [testSending, setTestSending] = useState(false)
+
+  async function handleSaveEmail() {
+    if (!emailServiceId.trim() || !emailTemplateId.trim() || !emailPublicKey.trim()) {
+      setEmailSaveMsg({ type: 'error', text: 'All three fields are required.' })
+      return
+    }
+    saveEmailConfig(emailServiceId.trim(), emailTemplateId.trim(), emailPublicKey.trim())
+    setEmailConnected(true)
+    setEmailSaveMsg({ type: 'success', text: 'Email connected successfully.' })
+    setTimeout(() => setEmailSaveMsg(null), 3000)
+  }
+
+  function handleDisconnectEmail() {
+    clearEmailConfig()
+    setEmailServiceId(''); setEmailTemplateId(''); setEmailPublicKey('')
+    setEmailConnected(false)
+    setEmailSaveMsg(null)
+  }
+
+  async function handleTestEmail() {
+    if (!user?.email) return
+    setTestSending(true)
+    setEmailSaveMsg(null)
+    try {
+      await sendBookingConfirmationEmail({
+        studentName: 'Test Student',
+        studentEmail: user.email,
+        date: new Date().toISOString().slice(0, 10),
+        time: '10:00',
+        duration: 30,
+        calendarType: 'Presentation',
+        lecturerName: 'Test Lecturer',
+        presentationTopic: 'Test Topic',
+      })
+      setEmailSaveMsg({ type: 'success', text: `Test email sent to ${user.email}.` })
+    } catch {
+      setEmailSaveMsg({ type: 'error', text: 'Failed to send test email. Check your credentials.' })
+    } finally {
+      setTestSending(false)
+      setTimeout(() => setEmailSaveMsg(null), 4000)
+    }
+  }
 
   // Security
   const [currentPassword, setCurrentPassword] = useState('')
@@ -58,8 +111,9 @@ export default function Settings() {
   }
 
   const tabs: { key: Tab; label: string; icon: React.ComponentType<{ style?: React.CSSProperties }> }[] = [
-    { key: 'profile', label: 'Profile', icon: User },
-    { key: 'general', label: 'General', icon: Globe },
+    { key: 'profile',  label: 'Profile',  icon: User   },
+    { key: 'general',  label: 'General',  icon: Globe  },
+    { key: 'email',    label: 'Email',    icon: Mail   },
     { key: 'security', label: 'Security', icon: Shield },
   ]
 
@@ -240,6 +294,138 @@ export default function Settings() {
                   <Toggle checked={item.on} onChange={() => {}} />
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Email tab */}
+        {activeTab === 'email' && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Status banner */}
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${
+              emailConnected
+                ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                : 'bg-amber-50 border-amber-100 text-amber-700'
+            }`}>
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${emailConnected ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              {emailConnected ? 'Email is connected — confirmations will be sent automatically.' : 'Email not connected. Students won\'t receive confirmation emails.'}
+            </div>
+
+            {/* Credentials card */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">EmailJS credentials</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Get these from your{' '}
+                    <a href="https://www.emailjs.com" target="_blank" rel="noreferrer" className="text-gray-900 underline inline-flex items-center gap-0.5">
+                      EmailJS dashboard <ExternalLink style={{ width: 10, height: 10 }} />
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Service ID</label>
+                  <input
+                    type="text"
+                    value={emailServiceId}
+                    onChange={e => setEmailServiceId(e.target.value)}
+                    placeholder="service_xxxxxxx"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Template ID</label>
+                  <input
+                    type="text"
+                    value={emailTemplateId}
+                    onChange={e => setEmailTemplateId(e.target.value)}
+                    placeholder="template_xxxxxxx"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Public Key</label>
+                  <div className="relative">
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      value={emailPublicKey}
+                      onChange={e => setEmailPublicKey(e.target.value)}
+                      placeholder="••••••••••••••••••••"
+                      className={`${inputCls} pr-10`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(p => !p)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showKey ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {emailSaveMsg && (
+                <div className={`mt-4 flex items-center gap-2 text-sm px-3 py-2.5 rounded-lg ${
+                  emailSaveMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                }`}>
+                  {emailSaveMsg.type === 'success'
+                    ? <Check style={{ width: 14, height: 14 }} />
+                    : <AlertCircle style={{ width: 14, height: 14 }} />}
+                  {emailSaveMsg.text}
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-4 flex-wrap">
+                <button
+                  onClick={handleSaveEmail}
+                  className="bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
+                >
+                  Save & connect
+                </button>
+                {emailConnected && (
+                  <button
+                    onClick={handleTestEmail}
+                    disabled={testSending}
+                    className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40"
+                  >
+                    {testSending ? 'Sending…' : 'Send test email'}
+                  </button>
+                )}
+                {emailConnected && (
+                  <button
+                    onClick={handleDisconnectEmail}
+                    className="border border-red-200 text-red-500 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors ml-auto"
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Template guide */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Email template variables</h2>
+              <p className="text-xs text-gray-500 mb-3">Use these in your EmailJS template to personalise each confirmation email:</p>
+              <div className="space-y-1.5">
+                {[
+                  ['{{to_name}}',            'Student\'s full name'],
+                  ['{{to_email}}',           'Student\'s email (set as "To" address)'],
+                  ['{{booking_date}}',       'e.g. Monday, June 9, 2026'],
+                  ['{{booking_time}}',       'e.g. 10:00 AM'],
+                  ['{{booking_duration}}',   'e.g. 30 minutes'],
+                  ['{{calendar_type}}',      'e.g. Presentation'],
+                  ['{{lecturer_name}}',      'Assigned lecturer (if any)'],
+                  ['{{presentation_topic}}', 'Presentation topic (if any)'],
+                ].map(([variable, desc]) => (
+                  <div key={variable} className="flex items-start gap-3 text-xs py-1.5 border-b border-gray-50 last:border-0">
+                    <code className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 shrink-0">{variable}</code>
+                    <span className="text-gray-500">{desc}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
