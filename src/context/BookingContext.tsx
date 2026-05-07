@@ -25,12 +25,13 @@ interface BookingContextType {
   removeSlot: (id: string) => Promise<void>
   clearAllSlots: () => Promise<void>
 
-  addCalendarType: (name: string, color: string) => Promise<CalendarTypeRecord>
+  addCalendarType: (name: string, color: string, description?: string) => Promise<CalendarTypeRecord>
   deleteCalendarType: (id: string) => Promise<void>
 
   getCalendarTypes: () => string[]
-  getAvailableDates: (calendarType?: string) => string[]
-  getAvailableSlots: (date: string, calendarType?: string) => PresentationSlot[]
+  getLecturersForType: (calendarType?: string) => string[]
+  getAvailableDates: (calendarType?: string, lecturerName?: string) => string[]
+  getAvailableSlots: (date: string, calendarType?: string, lecturerName?: string) => PresentationSlot[]
   bookSlot: (slotId: string, data: { studentName: string; studentEmail: string; presentationTopic: string; notes: string }, initialStatus?: 'pending' | 'confirmed') => Promise<Booking>
   confirmBooking: (id: string) => Promise<void>
   getStudentBookings: (email: string) => Booking[]
@@ -66,7 +67,7 @@ function toConfig(r: any): SlotConfig {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toCalendarType(r: any): CalendarTypeRecord {
-  return { id: r.id, name: r.name, color: r.color ?? 'blue', createdAt: r.created_at }
+  return { id: r.id, name: r.name, color: r.color ?? 'blue', description: r.description ?? undefined, createdAt: r.created_at }
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
@@ -168,8 +169,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setBookings(prev => prev.map(b => ({ ...b, status: 'cancelled' as const })))
   }, [])
 
-  const addCalendarType = useCallback(async (name: string, color: string): Promise<CalendarTypeRecord> => {
-    const { data, error } = await supabase.from('calendar_types').insert({ id: crypto.randomUUID(), name, color }).select().single()
+  const addCalendarType = useCallback(async (name: string, color: string, description?: string): Promise<CalendarTypeRecord> => {
+    const { data, error } = await supabase.from('calendar_types').insert({ id: crypto.randomUUID(), name, color, description: description?.trim() || null }).select().single()
     if (error) throw new Error(error.message)
     const record = toCalendarType(data)
     setCalendarTypeRecords(prev => [...prev, record])
@@ -191,20 +192,39 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     return Array.from(types).sort()
   }, [slots, bookedSlotIds])
 
-  const getAvailableDates = useCallback((calendarType?: string): string[] => {
+  const getLecturersForType = useCallback((calendarType?: string): string[] => {
+    const today = new Date().toISOString().slice(0, 10)
+    const names = new Set<string>()
+    for (const slot of slots) {
+      if (!bookedSlotIds.has(slot.id) && slot.date >= today && slot.lecturerName) {
+        if (!calendarType || slot.calendarType === calendarType) names.add(slot.lecturerName)
+      }
+    }
+    return Array.from(names).sort()
+  }, [slots, bookedSlotIds])
+
+  const getAvailableDates = useCallback((calendarType?: string, lecturerName?: string): string[] => {
     const today = new Date().toISOString().slice(0, 10)
     const dates = new Set<string>()
     for (const slot of slots) {
       if (!bookedSlotIds.has(slot.id) && slot.date >= today) {
-        if (!calendarType || slot.calendarType === calendarType) dates.add(slot.date)
+        if (!calendarType || slot.calendarType === calendarType) {
+          if (!lecturerName || slot.lecturerName?.toLowerCase() === lecturerName.toLowerCase()) {
+            dates.add(slot.date)
+          }
+        }
       }
     }
     return Array.from(dates).sort()
   }, [slots, bookedSlotIds])
 
-  const getAvailableSlots = useCallback((date: string, calendarType?: string): PresentationSlot[] => {
+  const getAvailableSlots = useCallback((date: string, calendarType?: string, lecturerName?: string): PresentationSlot[] => {
     return slots
-      .filter(s => s.date === date && !bookedSlotIds.has(s.id) && (!calendarType || s.calendarType === calendarType))
+      .filter(s =>
+        s.date === date && !bookedSlotIds.has(s.id)
+        && (!calendarType || s.calendarType === calendarType)
+        && (!lecturerName || s.lecturerName?.toLowerCase() === lecturerName.toLowerCase())
+      )
       .sort((a, b) => a.time.localeCompare(b.time))
   }, [slots, bookedSlotIds])
 
@@ -336,7 +356,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       slots, bookings, slotConfigs, calendarTypeRecords, adminSettings, loading,
       generateSlots, removeSlot, clearAllSlots,
       addCalendarType, deleteCalendarType,
-      getCalendarTypes, getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking, confirmBooking,
+      getCalendarTypes, getLecturersForType, getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking, confirmBooking,
       rescheduleBooking, addAdminComment,
       getLecturerSlots, getLecturerBookings,
       getBookingsForDateRange, exportBookingsCSV, updateAdminSettings,

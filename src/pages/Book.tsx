@@ -4,14 +4,15 @@ import { format } from 'date-fns'
 import {
   Check, Clock, CalendarDays,
   Mail, User, AlertCircle, ChevronRight,
-  Globe, ChevronLeft, Zap,
+  Globe, ChevronLeft, Zap, Users,
 } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
+import { useAuth } from '../context/AuthContext'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
 import type { PresentationSlot } from '../types'
 
-type View = 'type' | 'select' | 'confirm'
+type View = 'type' | 'lecturer' | 'select' | 'confirm'
 
 const COLOR_BG: Record<string, string> = {
   blue: '#006BFF', purple: '#7C3AED', green: '#059669',
@@ -26,7 +27,12 @@ const COLOR_LIGHT: Record<string, string> = {
 export default function Book() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { getAvailableDates, getAvailableSlots, bookSlot, adminSettings, getCalendarTypes, calendarTypeRecords } = useBookings()
+  const { getAvailableDates, getAvailableSlots, getLecturersForType, bookSlot, adminSettings, getCalendarTypes, calendarTypeRecords } = useBookings()
+  const { lecturers, loadLecturers } = useAuth()
+
+  useEffect(() => {
+    loadLecturers().catch(() => {})
+  }, [loadLecturers])
 
   function getTypeMeta(typeName: string | null) {
     const record = calendarTypeRecords.find(t => t.name === typeName)
@@ -40,6 +46,7 @@ export default function Book() {
 
   const [view, setView] = useState<View>('type')
   const [calendarType, setCalendarType] = useState<string | null>(null)
+  const [selectedLecturerName, setSelectedLecturerName] = useState<string | null>(null)
   const [date, setDate] = useState<Date | null>(null)
   const [slotId, setSlotId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -53,12 +60,12 @@ export default function Book() {
 
   const calendarTypes = useMemo(() => getCalendarTypes(), [getCalendarTypes])
   const availableDates = useMemo(
-    () => getAvailableDates(calendarType ?? undefined),
-    [getAvailableDates, calendarType],
+    () => getAvailableDates(calendarType ?? undefined, selectedLecturerName ?? undefined),
+    [getAvailableDates, calendarType, selectedLecturerName],
   )
   const slotsForDate = useMemo(
-    () => (date ? getAvailableSlots(format(date, 'yyyy-MM-dd'), calendarType ?? undefined) : []),
-    [date, getAvailableSlots, calendarType],
+    () => (date ? getAvailableSlots(format(date, 'yyyy-MM-dd'), calendarType ?? undefined, selectedLecturerName ?? undefined) : []),
+    [date, getAvailableSlots, calendarType, selectedLecturerName],
   )
   const selectedSlot: PresentationSlot | null = useMemo(
     () => slotsForDate.find(s => s.id === slotId) ?? null,
@@ -68,11 +75,15 @@ export default function Book() {
   // Pre-select type from URL param or if only one exists
   useEffect(() => {
     const urlType = searchParams.get('type')
-    if (urlType && calendarTypes.includes(urlType)) {
-      setCalendarType(urlType)
-      setView('select')
-    } else if (calendarTypes.length <= 1) {
-      setCalendarType(calendarTypes[0] ?? null)
+    const type = (urlType && calendarTypes.includes(urlType)) ? urlType
+      : calendarTypes.length <= 1 ? (calendarTypes[0] ?? null) : null
+    if (!type) return
+    setCalendarType(type)
+    const available = getLecturersForType(type)
+    if (available.length > 1) {
+      setView('lecturer')
+    } else {
+      setSelectedLecturerName(available[0] ?? null)
       setView('select')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,6 +91,20 @@ export default function Book() {
 
   function handleSelectType(type: string) {
     setCalendarType(type)
+    setSelectedLecturerName(null)
+    setDate(null)
+    setSlotId(null)
+    const available = getLecturersForType(type)
+    if (available.length > 1) {
+      setView('lecturer')
+    } else {
+      setSelectedLecturerName(available[0] ?? null)
+      setView('select')
+    }
+  }
+
+  function handleSelectLecturer(name: string) {
+    setSelectedLecturerName(name)
     setDate(null)
     setSlotId(null)
     setView('select')
@@ -124,6 +149,7 @@ export default function Book() {
   function resetAll() {
     setView(calendarTypes.length > 1 ? 'type' : 'select')
     setCalendarType(calendarTypes.length <= 1 ? (calendarTypes[0] ?? null) : null)
+    setSelectedLecturerName(null)
     setDate(null); setSlotId(null)
     setName(''); setEmail(''); setPresentationTopic(''); setNotes('')
     setErrors({}); setBookingError(''); setSubmitted(false)
@@ -247,17 +273,85 @@ export default function Book() {
     )
   }
 
+  // ── VIEW: lecturer selection ────────────────────────────────────────────────
+  if (view === 'lecturer') {
+    const lecturerNames = getLecturersForType(calendarType ?? undefined)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 sm:p-8 py-10 sm:py-16">
+        <div className="w-full max-w-lg animate-fade-in-up">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-full bg-gray-900 text-white flex items-center justify-center text-lg font-bold mx-auto mb-3">
+              BS
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">Who would you like to meet?</h1>
+            <p className="mt-1 text-sm text-gray-500">Choose a team member to see their available times.</p>
+          </div>
+
+          {calendarTypes.length > 1 && (
+            <button
+              onClick={() => setView('type')}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-5 transition-colors mx-auto"
+            >
+              <ChevronLeft style={{ width: 14, height: 14 }} />
+              Back to session types
+            </button>
+          )}
+
+          <div className="space-y-3">
+            {lecturerNames.map(name => {
+              const profile = lecturers.find(l => l.name.toLowerCase() === name.toLowerCase())
+              const slotCount = getAvailableDates(calendarType ?? undefined, name)
+                .reduce((acc, d) => acc + getAvailableSlots(d, calendarType ?? undefined, name).length, 0)
+              const initials = name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+
+              return (
+                <button
+                  key={name}
+                  onClick={() => handleSelectLecturer(name)}
+                  className="w-full group flex items-center gap-4 bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold text-gray-900">{name}</p>
+                    {profile?.classGroup && (
+                      <p className="text-xs text-gray-400 mt-0.5">{profile.classGroup}</p>
+                    )}
+                    {profile?.description && (
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed line-clamp-2">{profile.description}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-500">
+                      <Clock style={{ width: 13, height: 13 }} />
+                      <span>{slotCount > 0 ? `${slotCount} slot${slotCount !== 1 ? 's' : ''} available` : 'No slots available'}</span>
+                    </div>
+                  </div>
+                  <ChevronRight
+                    style={{ width: 18, height: 18 }}
+                    className="text-gray-300 group-hover:text-gray-600 transition-colors flex-shrink-0"
+                  />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Booking layout (select + confirm share same outer shell) ─────────────────
+  const hasLecturerStep = getLecturersForType(calendarType ?? undefined).length > 1
+
   // Organizer info panel (left column)
   const OrganizerPanel = (
     <div className="p-6 md:p-8 border-b md:border-b-0 md:border-r border-gray-100 md:w-64 flex-shrink-0">
-      {calendarTypes.length > 1 && (
+      {(calendarTypes.length > 1 || hasLecturerStep) && (
         <button
-          onClick={() => setView('type')}
+          onClick={() => hasLecturerStep ? setView('lecturer') : setView('type')}
           className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 mb-5 transition-colors"
         >
           <ChevronLeft style={{ width: 14, height: 14 }} />
-          All types
+          {hasLecturerStep ? 'All team members' : 'All types'}
         </button>
       )}
 
@@ -278,7 +372,16 @@ export default function Book() {
         </div>
       )}
 
-      <h2 className="text-base font-bold text-gray-900 leading-snug mb-4">
+      {selectedLecturerName && (
+        <div className="flex items-center gap-2 mt-2 mb-1">
+          <div className="w-6 h-6 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+            {selectedLecturerName.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <span className="text-xs font-medium text-gray-700 truncate">{selectedLecturerName}</span>
+        </div>
+      )}
+
+      <h2 className="text-base font-bold text-gray-900 leading-snug mb-4 mt-2">
         {adminSettings.welcomeMessage || 'Book a Session'}
       </h2>
 
@@ -392,11 +495,17 @@ export default function Book() {
             </div>
           )}
 
-          <h2 className="text-base font-bold text-gray-900 mb-5">
+          <h2 className="text-base font-bold text-gray-900 mb-4 mt-1">
             {adminSettings.welcomeMessage || 'Book a Session'}
           </h2>
 
           <div className="space-y-2.5 text-sm text-gray-500">
+            {selectedLecturerName && (
+              <div className="flex items-center gap-2">
+                <Users style={{ width: 14, height: 14 }} className="flex-shrink-0" />
+                <span>{selectedLecturerName}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Clock style={{ width: 14, height: 14 }} className="flex-shrink-0" />
               <span>{selectedSlot?.duration} min</span>
