@@ -49,9 +49,11 @@ function EventTypeCard({ name, color, count, description }: { name: string; colo
 }
 
 export default function Home() {
-  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings, calendarTypeRecords, publicLecturers } = useBookings()
+  const { slots, bookings, getAvailableDates, getAvailableSlots, getLecturersForType, adminSettings, calendarTypeRecords, publicLecturers } = useBookings()
 
-  const totalAvailable = slots.length - bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length
+  const today = new Date().toISOString().slice(0, 10)
+  const bookedSlotIds = new Set(bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').map(b => b.slotId))
+  const totalAvailable = slots.filter(s => !bookedSlotIds.has(s.id) && s.date >= today).length
   const upcomingDates = getAvailableDates().slice(0, 5)
 
   function getSlotCount(typeName: string) {
@@ -60,14 +62,37 @@ export default function Home() {
     }, 0)
   }
 
-  function getLecturerSlotCount(name: string) {
-    const lecturerDates = getAvailableDates(undefined, name)
-    if (lecturerDates.length > 0) {
-      return lecturerDates.reduce((acc, date) => acc + getAvailableSlots(date, undefined, name).length, 0)
+  // Build lecturer display list from two sources:
+  // 1. Names with assigned slots (from slots data — always loads)
+  // 2. Enriched with profile data if available (from lecturer_profiles)
+  const namesFromSlots = getLecturersForType()
+  const lecturerDisplayList: Array<{ key: string; name: string; classGroup?: string; description?: string; slotCount: number }> = (() => {
+    if (namesFromSlots.length > 0) {
+      return namesFromSlots.map(name => {
+        const profile = publicLecturers.find(l => l.name.toLowerCase() === name.toLowerCase())
+        const dates = getAvailableDates(undefined, name)
+        const count = dates.reduce((acc, d) => acc + getAvailableSlots(d, undefined, name).length, 0)
+        return {
+          key: name,
+          name,
+          classGroup: profile?.classGroup,
+          description: profile?.description,
+          slotCount: count,
+        }
+      })
     }
-    // Slots not assigned per-lecturer — show total available
-    return getAvailableDates().reduce((acc, date) => acc + getAvailableSlots(date).length, 0)
-  }
+    // Fallback: use profiles only (slots may not have lecturerName set)
+    return publicLecturers.map(l => {
+      const total = getAvailableDates().reduce((acc, d) => acc + getAvailableSlots(d).length, 0)
+      return {
+        key: l.id,
+        name: l.name,
+        classGroup: l.classGroup,
+        description: l.description,
+        slotCount: total,
+      }
+    })
+  })()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,20 +134,19 @@ export default function Home() {
 
       <div className="max-w-2xl mx-auto px-6 py-8">
 
-        {/* Team */}
-        {publicLecturers.length > 0 && (
+        {/* Team — sourced from slot assignments, enriched by profiles */}
+        {lecturerDisplayList.length > 0 && (
           <div className="mb-8">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
               Meet the team
             </p>
             <div className="space-y-3">
-              {publicLecturers.map(lecturer => {
-                const count = getLecturerSlotCount(lecturer.name)
+              {lecturerDisplayList.map(lecturer => {
                 const initials = lecturer.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
                 return (
                   <Link
-                    key={lecturer.id}
-                    to="/book"
+                    key={lecturer.key}
+                    to={`/book?lecturer=${encodeURIComponent(lecturer.name)}`}
                     className="group flex items-center gap-4 bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all"
                   >
                     <div className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
@@ -138,7 +162,7 @@ export default function Home() {
                       )}
                       <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-500">
                         <Clock style={{ width: 13, height: 13 }} />
-                        <span>{count > 0 ? `${count} slot${count !== 1 ? 's' : ''} available` : 'No slots available'}</span>
+                        <span>{lecturer.slotCount > 0 ? `${lecturer.slotCount} slot${lecturer.slotCount !== 1 ? 's' : ''} available` : 'No slots available'}</span>
                       </div>
                     </div>
                     <ArrowRight
