@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { eachDayOfInterval, parseISO, format } from 'date-fns'
-import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord } from '../types'
+import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord, LecturerProfile } from '../types'
 import { supabase } from '../lib/supabase'
 
 export interface AdminSettings {
@@ -18,6 +18,7 @@ interface BookingContextType {
   bookings: Booking[]
   slotConfigs: SlotConfig[]
   calendarTypeRecords: CalendarTypeRecord[]
+  publicLecturers: LecturerProfile[]
   adminSettings: AdminSettings
   loading: boolean
 
@@ -70,27 +71,35 @@ function toCalendarType(r: any): CalendarTypeRecord {
   return { id: r.id, name: r.name, color: r.color ?? 'blue', description: r.description ?? undefined, createdAt: r.created_at }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toLecturerPublic(r: any): LecturerProfile {
+  return { id: r.id, name: r.name, email: r.email, classGroup: r.class_group ?? undefined, description: r.description ?? undefined, createdAt: r.created_at }
+}
+
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [slots, setSlots] = useState<PresentationSlot[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([])
   const [calendarTypeRecords, setCalendarTypeRecords] = useState<CalendarTypeRecord[]>([])
+  const [publicLecturers, setPublicLecturers] = useState<LecturerProfile[]>([])
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [slotsRes, bookingsRes, configsRes, settingsRes, calTypesRes] = await Promise.all([
+      const [slotsRes, bookingsRes, configsRes, settingsRes, calTypesRes, lecturersRes] = await Promise.all([
         supabase.from('slots').select('*').order('date').order('time'),
         supabase.from('bookings').select('*').order('created_at', { ascending: false }),
         supabase.from('slot_configs').select('*').order('created_at', { ascending: false }),
         supabase.from('admin_settings').select('*').eq('id', 1).single(),
         supabase.from('calendar_types').select('*').order('created_at'),
+        supabase.from('lecturer_profiles').select('id, name, email, class_group, description, created_at').order('created_at'),
       ])
       if (slotsRes.data) setSlots(slotsRes.data.map(toSlot))
       if (bookingsRes.data) setBookings(bookingsRes.data.map(toBooking))
       if (configsRes.data) setSlotConfigs(configsRes.data.map(toConfig))
       if (calTypesRes.data) setCalendarTypeRecords(calTypesRes.data.map(toCalendarType))
+      if (lecturersRes.data) setPublicLecturers(lecturersRes.data.map(toLecturerPublic))
       if (settingsRes.data) {
         setAdminSettings({ welcomeMessage: settingsRes.data.welcome_message, allowSelfCancel: settingsRes.data.allow_self_cancel })
       }
@@ -353,7 +362,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   return (
     <BookingContext.Provider value={{
-      slots, bookings, slotConfigs, calendarTypeRecords, adminSettings, loading,
+      slots, bookings, slotConfigs, calendarTypeRecords, publicLecturers, adminSettings, loading,
       generateSlots, removeSlot, clearAllSlots,
       addCalendarType, deleteCalendarType,
       getCalendarTypes, getLecturersForType, getAvailableDates, getAvailableSlots, bookSlot, getStudentBookings, cancelBooking, confirmBooking,

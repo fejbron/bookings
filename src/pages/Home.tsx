@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
-import { useEffect } from 'react'
 import { Clock, ArrowRight, CalendarDays, Globe } from 'lucide-react'
 import { useBookings } from '../context/BookingContext'
-import { useAuth } from '../context/AuthContext'
 import { format, parseISO } from 'date-fns'
 
 const COLOR_BG: Record<string, string> = {
@@ -51,10 +49,7 @@ function EventTypeCard({ name, color, count, description }: { name: string; colo
 }
 
 export default function Home() {
-  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings, calendarTypeRecords } = useBookings()
-  const { lecturers, loadLecturers } = useAuth()
-
-  useEffect(() => { loadLecturers().catch(() => {}) }, [loadLecturers])
+  const { slots, bookings, getAvailableDates, getAvailableSlots, adminSettings, calendarTypeRecords, publicLecturers } = useBookings()
 
   const totalAvailable = slots.length - bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length
   const upcomingDates = getAvailableDates().slice(0, 5)
@@ -112,13 +107,13 @@ export default function Home() {
       <div className="max-w-2xl mx-auto px-6 py-8">
 
         {/* Team */}
-        {lecturers.length > 0 && (
+        {publicLecturers.length > 0 && (
           <div className="mb-8">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
               Meet the team
             </p>
             <div className="space-y-3">
-              {lecturers.map(lecturer => {
+              {publicLecturers.map(lecturer => {
                 const count = getLecturerSlotCount(lecturer.name)
                 const initials = lecturer.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
                 return (
