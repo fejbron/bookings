@@ -643,6 +643,14 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                {/* Cancellation reason */}
+                {selectedBooking.status === 'cancelled' && selectedBooking.cancellationReason && (
+                  <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5">
+                    <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wide mb-1">Cancellation Reason</p>
+                    <p className="text-sm text-red-700 leading-relaxed">{selectedBooking.cancellationReason}</p>
+                  </div>
+                )}
+
                 {/* Booking meta */}
                 <div className="pt-1 border-t border-[var(--border)] text-[10px] text-[var(--text-muted)]">
                   <p>ID: {selectedBooking.id.slice(0, 8).toUpperCase()}</p>
@@ -1031,6 +1039,14 @@ export default function Dashboard() {
                 <div>
                   <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">Internal Note</p>
                   <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic">{selectedBooking.adminComment}</p>
+                </div>
+              )}
+
+              {/* Cancellation reason */}
+              {selectedBooking.status === 'cancelled' && selectedBooking.cancellationReason && (
+                <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5">
+                  <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wide mb-1">Cancellation Reason</p>
+                  <p className="text-sm text-red-700 leading-relaxed">{selectedBooking.cancellationReason}</p>
                 </div>
               )}
 
