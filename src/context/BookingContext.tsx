@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { eachDayOfInterval, parseISO, format } from 'date-fns'
 import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord, LecturerProfile } from '../types'
 import { supabase } from '../lib/supabase'
+import { sendBookingConfirmationEmail } from '../lib/email'
 
 export interface AdminSettings {
   welcomeMessage: string
@@ -288,8 +289,25 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const confirmBooking = useCallback(async (id: string) => {
     await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', id)
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'confirmed' as const } : b))
-  }, [])
+    setBookings(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, status: 'confirmed' as const } : b)
+      const booking = updated.find(b => b.id === id)
+      if (booking) {
+        const slot = slots.find(s => s.id === booking.slotId)
+        sendBookingConfirmationEmail({
+          studentName:       booking.studentName,
+          studentEmail:      booking.studentEmail,
+          date:              booking.date,
+          time:              booking.time,
+          duration:          booking.duration,
+          calendarType:      slot?.calendarType ?? '',
+          lecturerName:      slot?.lecturerName,
+          presentationTopic: booking.presentationTopic,
+        }).catch(() => {})
+      }
+      return updated
+    })
+  }, [slots])
 
   const rescheduleBooking = useCallback(async (bookingId: string, newSlotId: string) => {
     const newSlot = slots.find(s => s.id === newSlotId)
