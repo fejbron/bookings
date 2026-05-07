@@ -100,6 +100,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       if (bookingsRes.data) setBookings(bookingsRes.data.map(toBooking))
       if (configsRes.data) setSlotConfigs(configsRes.data.map(toConfig))
       if (calTypesRes.data) setCalendarTypeRecords(calTypesRes.data.map(toCalendarType))
+      if (lecturersRes.error) console.error('[BookingContext] lecturer_profiles fetch error:', lecturersRes.error.message)
       if (lecturersRes.data) setPublicLecturers(lecturersRes.data.map(toLecturerPublic))
       if (settingsRes.data) {
         setAdminSettings({ welcomeMessage: settingsRes.data.welcome_message, allowSelfCancel: settingsRes.data.allow_self_cancel })
