@@ -2,6 +2,14 @@
 -- Run this entire script in your Supabase SQL Editor
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 0. Drop old single-tenant constraints that break multi-tenant
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- calendar_types had a unique constraint on name alone; replace with (name, user_id)
+ALTER TABLE calendar_types DROP CONSTRAINT IF EXISTS calendar_types_name_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ct_name_user ON calendar_types(name, user_id) WHERE user_id IS NOT NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Schema changes
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -38,7 +46,8 @@ DROP POLICY IF EXISTS "lp_update"     ON lecturer_profiles;
 DROP POLICY IF EXISTS "lp_delete"     ON lecturer_profiles;
 CREATE POLICY "lp_read"   ON lecturer_profiles FOR SELECT USING (is_public OR auth.uid() = user_id);
 CREATE POLICY "lp_insert" ON lecturer_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "lp_update" ON lecturer_profiles FOR UPDATE USING (auth.uid() = user_id);
+-- Allow updating rows where user_id IS NULL so existing profiles can be claimed by a new auth user
+CREATE POLICY "lp_update" ON lecturer_profiles FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL);
 CREATE POLICY "lp_delete" ON lecturer_profiles FOR DELETE USING (auth.uid() = user_id);
 
 -- slots: public can read (needed for booking pages); owner manages their own

@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User } from 'lucide-react'
+import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User, Users, Trash2, UserPlus } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useBookings } from '../../context/BookingContext'
 import { saveEmailConfig, clearEmailConfig, getEmailConfig, isEmailConfigured, sendBookingConfirmationEmail } from '../../lib/email'
 
-type Tab = 'profile' | 'general' | 'email' | 'security'
+type Tab = 'profile' | 'general' | 'email' | 'security' | 'team'
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -18,7 +18,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 const inputCls = "w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
 
 export default function DashboardSettings() {
-  const { profile, updateProfile, changePassword, user } = useAuth()
+  const { profile, updateProfile, changePassword, user, teamMembers, inviteTeamMember, removeTeamMember, isManagingOther } = useAuth()
   const { userSettings, updateUserSettings } = useBookings()
 
   const [activeTab, setActiveTab] = useState<Tab>('profile')
@@ -46,6 +46,12 @@ export default function DashboardSettings() {
   const [emailConnected, setEmailConnected] = useState(isEmailConfigured())
   const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [testSending, setTestSending] = useState(false)
+
+  // Team tab
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   // Security tab
   const [currentPw, setCurrentPw] = useState('')
@@ -129,10 +135,33 @@ export default function DashboardSettings() {
     setPwLoading(false)
   }
 
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInviteLoading(true)
+    setInviteMsg(null)
+    const err = await inviteTeamMember(inviteEmail)
+    if (err) {
+      setInviteMsg({ type: 'error', text: err })
+    } else {
+      setInviteMsg({ type: 'success', text: `${inviteEmail.trim().toLowerCase()} can now manage your bookings.` })
+      setInviteEmail('')
+      setTimeout(() => setInviteMsg(null), 4000)
+    }
+    setInviteLoading(false)
+  }
+
+  async function handleRemove(id: string) {
+    setRemovingId(id)
+    await removeTeamMember(id)
+    setRemovingId(null)
+  }
+
   const TABS: { key: Tab; label: string; icon: typeof User }[] = [
     { key: 'profile', label: 'Profile', icon: User },
     { key: 'general', label: 'General', icon: Globe },
     { key: 'email', label: 'Email', icon: Mail },
+    { key: 'team', label: 'Team', icon: Users },
     { key: 'security', label: 'Security', icon: Shield },
   ]
 
@@ -293,6 +322,83 @@ export default function DashboardSettings() {
                     </>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Team */}
+            {activeTab === 'team' && (
+              <div className="space-y-4">
+                {isManagingOther ? (
+                  <div className="bg-white rounded-xl border border-[var(--border)] p-6">
+                    <p className="text-sm text-gray-500">Team settings can only be managed from your own account.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Invite form */}
+                    <div className="bg-white rounded-xl border border-[var(--border)] p-6 space-y-4">
+                      <div>
+                        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Team members</h2>
+                        <p className="mt-1 text-xs text-gray-500">Add a secretary or PA by email. They can log in with their own account and switch to managing your bookings.</p>
+                      </div>
+
+                      <form onSubmit={handleInvite} className="flex gap-2">
+                        <input
+                          type="email"
+                          value={inviteEmail}
+                          onChange={e => setInviteEmail(e.target.value)}
+                          placeholder="colleague@example.com"
+                          className={`${inputCls} flex-1`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!inviteEmail.trim() || inviteLoading}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 shrink-0"
+                        >
+                          <UserPlus style={{ width: 14, height: 14 }} />
+                          {inviteLoading ? 'Adding…' : 'Add'}
+                        </button>
+                      </form>
+
+                      {inviteMsg && (
+                        <div className={`flex items-center gap-2 text-sm px-3.5 py-2.5 rounded-lg ${inviteMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                          {inviteMsg.type === 'success' ? <Check style={{ width: 14, height: 14 }} /> : <AlertCircle style={{ width: 14, height: 14 }} />}
+                          {inviteMsg.text}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Members list */}
+                    {teamMembers.length > 0 && (
+                      <div className="bg-white rounded-xl border border-[var(--border)] divide-y divide-gray-100">
+                        {teamMembers.map(member => (
+                          <div key={member.id} className="flex items-center gap-3 px-5 py-3.5">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
+                              {member.memberEmail.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{member.memberEmail}</p>
+                              <p className="text-xs text-gray-400 capitalize">{member.role} · {member.memberUserId ? 'Active' : 'Pending sign-up'}</p>
+                            </div>
+                            <button
+                              onClick={() => handleRemove(member.id)}
+                              disabled={removingId === member.id}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                            >
+                              <Trash2 style={{ width: 14, height: 14 }} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {teamMembers.length === 0 && (
+                      <div className="bg-white rounded-xl border border-[var(--border)] p-8 text-center">
+                        <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">No team members yet.</p>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

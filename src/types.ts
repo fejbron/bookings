@@ -48,6 +48,22 @@ export interface SlotConfig {
   createdAt: string
 }
 
+export interface TeamMember {
+  id: string
+  hostUserId: string
+  memberEmail: string
+  memberUserId?: string
+  role: string
+  status: 'active' | 'pending'
+  createdAt: string
+}
+
+export interface ManagedAccount {
+  hostUserId: string
+  profile: LecturerProfile
+  role: string
+}
+
 export interface Booking {
   id: string
   slotId: string

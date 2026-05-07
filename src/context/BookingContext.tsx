@@ -3,6 +3,7 @@ import { eachDayOfInterval, parseISO, format } from 'date-fns'
 import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord } from '../types'
 import { supabase } from '../lib/supabase'
 import { sendBookingConfirmationEmail } from '../lib/email'
+import { useAuth } from './AuthContext'
 
 export interface UserSettings {
   welcomeMessage: string
@@ -62,7 +63,8 @@ function toCalendarType(r: any): CalendarTypeRecord {
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null | undefined>(undefined)
+  const { activeUserId, loading: authLoading } = useAuth()
+  const userId = activeUserId
   const [slots, setSlots] = useState<PresentationSlot[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([])
@@ -71,17 +73,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id ?? null)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    if (userId === undefined) return // waiting for session check
+    if (authLoading) return // wait for auth to resolve
 
     if (userId === null) {
       setSlots([])
@@ -130,7 +122,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     }
     load()
-  }, [userId])
+  }, [userId, authLoading])
 
   const bookedSlotIds = new Set(
     bookings.filter(b => b.status === 'confirmed' || b.status === 'pending').map(b => b.slotId)
