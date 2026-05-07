@@ -2,104 +2,46 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Navigate } from 'react-router-dom'
 import { BookingProvider } from './context/BookingContext'
 import { AuthProvider } from './context/AuthContext'
-import AdminGuard from './components/AdminGuard'
-import LecturerGuard from './components/LecturerGuard'
-import Sidebar from './components/Navbar'
+import AuthGuard from './components/AuthGuard'
+import DashboardLayout from './pages/dashboard/Layout'
 import Home from './pages/Home'
-import Book from './pages/Book'
+import Login from './pages/Login'
+import Setup from './pages/Setup'
 import MyBookings from './pages/MyBookings'
-import AdminLogin from './pages/admin/Login'
-import Dashboard from './pages/admin/Dashboard'
-import ManageSlots from './pages/admin/ManageSlots'
-import Settings from './pages/admin/Settings'
-import Lecturers from './pages/admin/Lecturers'
-import EventTypes from './pages/admin/EventTypes'
-import Availability from './pages/admin/Availability'
-import Analytics from './pages/admin/Analytics'
-import LecturerDashboard from './pages/lecturer/Dashboard'
+import UserPage from './pages/UserPage'
+import DashboardBookings from './pages/dashboard/Bookings'
+import DashboardSlots from './pages/dashboard/Slots'
+import DashboardEventTypes from './pages/dashboard/EventTypes'
+import DashboardSettings from './pages/dashboard/Settings'
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <BookingProvider>
-          <div className="app-layout">
-            <Sidebar />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/book" element={<Book />} />
-                <Route path="/my-bookings" element={<MyBookings />} />
-                <Route path="/bookings" element={<Navigate to="/my-bookings" replace />} />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/setup" element={<Setup />} />
+            <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/bookings" element={<Navigate to="/my-bookings" replace />} />
 
-                <Route path="/admin" element={<AdminLogin />} />
-                <Route
-                  path="/admin/dashboard"
-                  element={
-                    <AdminGuard>
-                      <Dashboard />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/event-types"
-                  element={
-                    <AdminGuard>
-                      <EventTypes />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/availability"
-                  element={
-                    <AdminGuard>
-                      <Availability />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/analytics"
-                  element={
-                    <AdminGuard>
-                      <Analytics />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/slots"
-                  element={
-                    <AdminGuard>
-                      <ManageSlots />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/settings"
-                  element={
-                    <AdminGuard>
-                      <Settings />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/admin/lecturers"
-                  element={
-                    <AdminGuard>
-                      <Lecturers />
-                    </AdminGuard>
-                  }
-                />
-                <Route
-                  path="/lecturer/dashboard"
-                  element={
-                    <LecturerGuard>
-                      <LecturerDashboard />
-                    </LecturerGuard>
-                  }
-                />
-              </Routes>
-            </main>
-          </div>
+            <Route
+              path="/dashboard"
+              element={
+                <AuthGuard>
+                  <DashboardLayout />
+                </AuthGuard>
+              }
+            >
+              <Route index element={<DashboardBookings />} />
+              <Route path="slots" element={<DashboardSlots />} />
+              <Route path="event-types" element={<DashboardEventTypes />} />
+              <Route path="settings" element={<DashboardSettings />} />
+            </Route>
+
+            <Route path="/:username" element={<UserPage />} />
+          </Routes>
         </BookingProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -3,189 +3,180 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { LecturerProfile } from '../types'
 
-// ── helpers ─────────────────────────────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toLecturer(r: any): LecturerProfile {
-  return { id: r.id, name: r.name, email: r.email, classGroup: r.class_group ?? undefined, createdAt: r.created_at }
+function toProfile(r: any): LecturerProfile {
+  return {
+    id: r.id,
+    userId: r.user_id ?? undefined,
+    username: r.username ?? undefined,
+    name: r.name,
+    email: r.email,
+    title: r.title ?? undefined,
+    classGroup: r.class_group ?? undefined,
+    description: r.description ?? undefined,
+    isPublic: r.is_public ?? true,
+    createdAt: r.created_at,
+  }
 }
-
-async function hashPassword(password: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-const LECTURER_SESSION_KEY = 'bookslot_lecturer_session'
-const SUPER_ADMIN_EMAILS = ['fejbroni@umat.edu.gh']
-
-// ── context types ────────────────────────────────────────────────────────────
 
 interface AuthContextType {
   user: User | null
-  isAdmin: boolean
-  isSuperAdmin: boolean
-  isLecturer: boolean
-  currentLecturer: LecturerProfile | null
-  lecturers: LecturerProfile[]
+  profile: LecturerProfile | null
   loading: boolean
-  login: (email: string, password: string) => Promise<string | null>
-  logout: () => Promise<void>
+  needsSetup: boolean
+  signIn: (email: string, password: string) => Promise<string | null>
+  signUp: (email: string, password: string) => Promise<string | null>
+  signOut: () => Promise<void>
+  createProfile: (data: { name: string; username: string; title?: string; description?: string }) => Promise<void>
+  updateProfile: (updates: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'isPublic'>>) => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>
-  createLecturerAccount: (name: string, email: string, password: string, classGroup: string) => Promise<void>
-  deleteLecturerAccount: (id: string) => Promise<void>
-  resetLecturerPassword: (id: string, newPassword: string) => Promise<void>
-  loadLecturers: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-// ── provider ─────────────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<LecturerProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [lecturers, setLecturers] = useState<LecturerProfile[]>([])
 
-  // Lecturer session lives in localStorage — no Supabase Auth needed for lecturers
-  const [lecturerUser, setLecturerUser] = useState<LecturerProfile | null>(() => {
-    try {
-      const stored = localStorage.getItem(LECTURER_SESSION_KEY)
-      return stored ? (JSON.parse(stored) as LecturerProfile) : null
-    } catch { return null }
-  })
-
-  const [superAdminLecturerProfile, setSuperAdminLecturerProfile] = useState<LecturerProfile | null>(null)
+  async function loadProfile(userId: string) {
+    const { data } = await supabase
+      .from('lecturer_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+    setProfile(data ? toProfile(data) : null)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) {
+        loadProfile(u.id).finally(() => setLoading(false))
+      } else {
+        setLoading(false)
+      }
     })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) loadProfile(u.id)
+      else { setProfile(null) }
     })
     return () => subscription.unsubscribe()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load the superadmin's lecturer profile so they can access lecturer features
-  useEffect(() => {
-    if (!user?.email || !SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-      setSuperAdminLecturerProfile(null)
-      return
-    }
-    supabase
-      .from('lecturer_profiles')
-      .select('id, name, email, class_group, created_at')
-      .eq('email', user.email.toLowerCase())
-      .maybeSingle()
-      .then(({ data }) => setSuperAdminLecturerProfile(data ? toLecturer(data) : null))
-  }, [user])
-
-  // ── login: check lecturer table first, then Supabase Auth for admin ────────
-
-  const login = useCallback(async (email: string, password: string): Promise<string | null> => {
-    const normalised = email.toLowerCase().trim()
-
-    // Super admins skip the lecturer table and always authenticate via Supabase Auth
-    if (!SUPER_ADMIN_EMAILS.includes(normalised)) {
-      const { data: lecturerRow, error: lecturerErr } = await supabase
-        .from('lecturer_profiles')
-        .select('id, name, email, password, class_group, created_at')
-        .eq('email', normalised)
-        .maybeSingle()
-
-      if (lecturerRow) {
-        const hash = await hashPassword(password)
-        if (lecturerRow.password !== hash) return 'Invalid email or password.'
-        await supabase.auth.signOut()
-        setUser(null)
-        const profile = toLecturer(lecturerRow)
-        setLecturerUser(profile)
-        localStorage.setItem(LECTURER_SESSION_KEY, JSON.stringify(profile))
-        return null
-      }
-
-      if (lecturerErr) console.warn('lecturer_profiles query error:', lecturerErr.message)
-    }
-
-    // Fall through to admin (Supabase Auth) — clear any stale lecturer session first
-    localStorage.removeItem(LECTURER_SESSION_KEY)
-    setLecturerUser(null)
-    const { error } = await supabase.auth.signInWithPassword({ email: normalised, password })
-    return error ? 'Invalid email or password.' : null
+  const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+    return error ? error.message : null
   }, [])
 
-  // ── logout ────────────────────────────────────────────────────────────────
+  const signUp = useCallback(async (email: string, password: string): Promise<string | null> => {
+    const { error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+    return error ? error.message : null
+  }, [])
 
-  const logout = useCallback(async () => {
-    // Always clear both sessions on logout
-    setLecturerUser(null)
-    localStorage.removeItem(LECTURER_SESSION_KEY)
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setProfile(null)
   }, [])
 
-  // ── admin: change password ────────────────────────────────────────────────
+  const createProfile = useCallback(async (data: {
+    name: string; username: string; title?: string; description?: string
+  }) => {
+    if (!user) throw new Error('Not authenticated')
+
+    // Check username is available
+    const { data: existing } = await supabase
+      .from('lecturer_profiles')
+      .select('id')
+      .eq('username', data.username.trim().toLowerCase())
+      .maybeSingle()
+    if (existing) throw new Error('That username is already taken.')
+
+    const { data: inserted, error } = await supabase
+      .from('lecturer_profiles')
+      .insert({
+        user_id: user.id,
+        email: user.email!,
+        name: data.name.trim(),
+        username: data.username.trim().toLowerCase(),
+        title: data.title?.trim() || null,
+        description: data.description?.trim() || null,
+        is_public: true,
+      })
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+    setProfile(toProfile(inserted))
+  }, [user])
+
+  const updateProfile = useCallback(async (
+    updates: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'isPublic'>>
+  ) => {
+    if (!user) throw new Error('Not authenticated')
+
+    // If changing username, check availability
+    if (updates.username && updates.username !== profile?.username) {
+      const { data: existing } = await supabase
+        .from('lecturer_profiles')
+        .select('id')
+        .eq('username', updates.username.trim().toLowerCase())
+        .maybeSingle()
+      if (existing) throw new Error('That username is already taken.')
+    }
+
+    const patch: Record<string, unknown> = {}
+    if (updates.name !== undefined) patch.name = updates.name.trim()
+    if (updates.username !== undefined) patch.username = updates.username.trim().toLowerCase()
+    if (updates.title !== undefined) patch.title = updates.title.trim() || null
+    if (updates.description !== undefined) patch.description = updates.description.trim() || null
+    if (updates.classGroup !== undefined) patch.class_group = updates.classGroup.trim() || null
+    if (updates.isPublic !== undefined) patch.is_public = updates.isPublic
+
+    const { data, error } = await supabase
+      .from('lecturer_profiles')
+      .update(patch)
+      .eq('user_id', user.id)
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+    setProfile(toProfile(data))
+  }, [user, profile])
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<string | null> => {
     if (!user?.email) return 'Not authenticated'
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
-    if (signInError) return 'Current password is incorrect.'
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    })
+    if (signInErr) return 'Current password is incorrect.'
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     return error ? error.message : null
   }, [user])
 
-  // ── lecturer management (admin only) ─────────────────────────────────────
+  const refreshProfile = useCallback(async () => {
+    if (user) await loadProfile(user.id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
-  const loadLecturers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('lecturer_profiles')
-      .select('id, name, email, class_group, created_at')
-      .order('created_at', { ascending: false })
-    if (error) throw new Error(error.message)
-    setLecturers((data ?? []).map(toLecturer))
-  }, [])
-
-  const createLecturerAccount = useCallback(async (name: string, email: string, password: string, classGroup: string) => {
-    const hash = await hashPassword(password)
-    const { data: inserted, error } = await supabase.from('lecturer_profiles').insert({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password: hash,
-      class_group: classGroup.trim() || null,
-    }).select('id, name, email, class_group, created_at').single()
-    if (error) throw new Error(error.message)
-
-    // Optimistically add the new lecturer, then try to sync from DB
-    if (inserted) {
-      setLecturers(prev => [toLecturer(inserted), ...prev])
-    }
-    // Also attempt a full reload (may be a no-op if RLS blocks SELECT)
-    loadLecturers().catch(() => {/* silently ignore if reload fails */})
-  }, [loadLecturers])
-
-  const deleteLecturerAccount = useCallback(async (id: string) => {
-    const { error } = await supabase.from('lecturer_profiles').delete().eq('id', id)
-    if (error) throw new Error(error.message)
-    setLecturers(prev => prev.filter(l => l.id !== id))
-  }, [])
-
-  const resetLecturerPassword = useCallback(async (id: string, newPassword: string) => {
-    const hash = await hashPassword(newPassword)
-    const { error } = await supabase.from('lecturer_profiles').update({ password: hash }).eq('id', id)
-    if (error) throw new Error(error.message)
-  }, [])
-
-  const isLecturer = !!lecturerUser
-  const isAdmin = !!user && !isLecturer
-  const isSuperAdmin = isAdmin && !!user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())
-  const currentLecturer = lecturerUser ?? (isSuperAdmin ? superAdminLecturerProfile : null)
+  const needsSetup = !!user && !loading && !profile
 
   return (
     <AuthContext.Provider value={{
-      user, isAdmin, isSuperAdmin, isLecturer, currentLecturer, lecturers, loading,
-      login, logout, changePassword,
-      createLecturerAccount, deleteLecturerAccount, resetLecturerPassword, loadLecturers,
+      user, profile, loading, needsSetup,
+      signIn, signUp, signOut, createProfile, updateProfile, changePassword, refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
