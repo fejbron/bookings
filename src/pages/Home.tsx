@@ -13,7 +13,7 @@ const COLOR_LIGHT: Record<string, string> = {
   orange: '#FED7AA', pink: '#FCE7F3', teal: '#CFFAFE', grey: '#F3F4F6',
 }
 
-function EventTypeCard({ name, color, count }: { name: string; color: string; count: number }) {
+function EventTypeCard({ name, color, count, description }: { name: string; color: string; count: number; description?: string }) {
   const bg = COLOR_BG[color] ?? '#4B5563'
   const light = COLOR_LIGHT[color] ?? '#F3F4F6'
 
@@ -23,13 +23,16 @@ function EventTypeCard({ name, color, count }: { name: string; color: string; co
       className="group block bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all"
     >
       <div className="flex items-start justify-between">
-        <div>
+        <div className="flex-1 min-w-0 pr-3">
           <div
             className="w-2 h-2 rounded-full mb-3"
             style={{ background: bg }}
           />
           <h3 className="text-[15px] font-semibold text-gray-900">{name}</h3>
-          <div className="flex items-center gap-1.5 mt-1.5 text-sm text-gray-500">
+          {description && (
+            <p className="text-xs text-gray-400 mt-1 leading-relaxed line-clamp-2">{description}</p>
+          )}
+          <div className="flex items-center gap-1.5 mt-2 text-sm text-gray-500">
             <Clock style={{ width: 13, height: 13 }} />
             <span>{count > 0 ? `${count} slot${count !== 1 ? 's' : ''} available` : 'No slots yet'}</span>
           </div>
@@ -114,6 +117,7 @@ export default function Home() {
                 name={record.name}
                 color={record.color}
                 count={getSlotCount(record.name)}
+                description={record.description}
               />
             ))}
           </div>

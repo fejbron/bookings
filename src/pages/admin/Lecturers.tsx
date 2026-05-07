@@ -12,6 +12,7 @@ export default function Lecturers() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [classGroup, setClassGroup] = useState('')
+  const [description, setDescription] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -45,8 +46,8 @@ export default function Lecturers() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      await createLecturerAccount(name, email, password, classGroup)
-      setName(''); setEmail(''); setPassword(''); setClassGroup('')
+      await createLecturerAccount(name, email, password, classGroup, description)
+      setName(''); setEmail(''); setPassword(''); setClassGroup(''); setDescription('')
       setShowForm(false)
       setSuccessMsg('Lecturer account created successfully.')
       setTimeout(() => setSuccessMsg(''), 4000)
@@ -216,6 +217,21 @@ export default function Lecturers() {
                   className={`${inputCls} border-[var(--border)]`}
                 />
               </div>
+
+              {/* Description */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                  Profile description <span className="text-[var(--text-muted)] font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={2}
+                  maxLength={300}
+                  placeholder="e.g. Senior lecturer in Computer Science, specialising in machine learning."
+                  className={`${inputCls} border-[var(--border)] resize-none`}
+                />
+              </div>
             </div>
 
             {submitError && (
@@ -283,6 +299,9 @@ export default function Lecturers() {
                     <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{lecturer.email}</p>
                     {lecturer.classGroup && (
                       <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-gray-100 text-xs text-[var(--text-secondary)] font-medium">{lecturer.classGroup}</span>
+                    )}
+                    {lecturer.description && (
+                      <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">{lecturer.description}</p>
                     )}
                   </div>
 

@@ -208,6 +208,7 @@ export default function Book() {
             <div className="space-y-3">
               {calendarTypes.map(type => {
                 const meta = getTypeMeta(type)
+                const typeRecord = calendarTypeRecords.find(r => r.name === type)
                 const count = getAvailableDates(type).reduce((acc, d) =>
                   acc + getAvailableSlots(d, type).length, 0)
 
@@ -218,12 +219,15 @@ export default function Book() {
                     className="w-full group flex items-center gap-4 bg-white rounded-2xl border border-gray-200 p-5 hover:border-gray-300 hover:shadow-md transition-all text-left"
                   >
                     <div
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
                       style={{ background: meta.bg }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-semibold text-gray-900">{type}</p>
-                      <p className="text-sm text-gray-500 mt-0.5">
+                      {typeRecord?.description && (
+                        <p className="text-xs text-gray-400 mt-0.5 leading-relaxed line-clamp-2">{typeRecord.description}</p>
+                      )}
+                      <p className="text-sm text-gray-500 mt-1">
                         {count > 0
                           ? `${count} slot${count !== 1 ? 's' : ''} available`
                           : 'No slots available'}
