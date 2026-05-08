@@ -6,7 +6,7 @@ import { toProfile, toCalendarType, toSlot, toBooking, toTeamMember } from './ma
 import { DbError } from './queries'
 import type {
   LecturerProfile, CalendarTypeRecord, PresentationSlot,
-  Booking, BookingStudent, TeamMember,
+  Booking, BookingStudent, TeamMember, AccountType,
 } from '../../types'
 
 // Profile ──────────────────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ export interface CreateProfileInput {
   email: string
   name: string
   username: string
+  accountType: AccountType
   title?: string
   description?: string
 }
@@ -30,6 +31,7 @@ export async function upsertProfile(input: CreateProfileInput): Promise<Lecturer
       username: input.username.trim().toLowerCase(),
       title: input.title?.trim() || null,
       description: input.description?.trim() || null,
+      account_type: input.accountType,
       is_public: true,
     }, { onConflict: 'email' })
     .select('*').single()
@@ -44,6 +46,7 @@ export interface UpdateProfileInput {
   title?: string
   description?: string
   classGroup?: string
+  accountType?: AccountType
   isPublic?: boolean
 }
 
@@ -54,6 +57,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<Lecturer
   if (input.title !== undefined)       patch.title = input.title.trim() || null
   if (input.description !== undefined) patch.description = input.description.trim() || null
   if (input.classGroup !== undefined)  patch.class_group = input.classGroup.trim() || null
+  if (input.accountType !== undefined) patch.account_type = input.accountType
   if (input.isPublic !== undefined)    patch.is_public = input.isPublic
 
   const { data, error } = await supabase

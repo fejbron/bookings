@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS lecturer_profiles (
   title        text,
   description  text,
   class_group  text,
+  account_type text NOT NULL DEFAULT 'professional',  -- 'lecturer' | 'professional'
   is_public    boolean NOT NULL DEFAULT true,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
@@ -97,12 +98,13 @@ CREATE TABLE IF NOT EXISTS team_members (
 
 -- Backfill columns that may be missing on legacy installations ─────────────────
 
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS user_id     uuid REFERENCES auth.users(id) ON DELETE CASCADE;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS username    text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS title       text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS description text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS class_group text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS is_public   boolean NOT NULL DEFAULT true;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS username     text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS title        text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS description  text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS class_group  text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS account_type text NOT NULL DEFAULT 'professional';
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS is_public    boolean NOT NULL DEFAULT true;
 
 ALTER TABLE calendar_types ADD COLUMN IF NOT EXISTS user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE calendar_types ADD COLUMN IF NOT EXISTS is_presentation boolean NOT NULL DEFAULT false;

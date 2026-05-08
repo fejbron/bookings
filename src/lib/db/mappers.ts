@@ -20,6 +20,7 @@ export function toProfile(r: LecturerProfileRow): LecturerProfile {
     title: r.title ?? undefined,
     description: r.description ?? undefined,
     classGroup: r.class_group ?? undefined,
+    accountType: r.account_type ?? 'professional',
     isPublic: r.is_public,
     createdAt: r.created_at,
   }

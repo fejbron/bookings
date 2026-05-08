@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User, Users, Trash2, UserPlus } from 'lucide-react'
+import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User, Users, Trash2, UserPlus, GraduationCap, BriefcaseBusiness } from 'lucide-react'
+import type { AccountType } from '../../types'
 import { useAuth, useAccount, useSettings } from '../../hooks'
 import { saveEmailConfig, clearEmailConfig, getEmailConfig, isEmailConfigured, sendBookingConfirmationEmail } from '../../lib/email'
 
@@ -24,6 +25,7 @@ export default function DashboardSettings() {
   const [activeTab, setActiveTab] = useState<Tab>('profile')
 
   // Profile tab
+  const [accountType, setAccountType] = useState<AccountType>(profile?.accountType ?? 'professional')
   const [name, setName] = useState(profile?.name ?? '')
   const [username, setUsername] = useState(profile?.username ?? '')
   const [title, setTitle] = useState(profile?.title ?? '')
@@ -69,7 +71,7 @@ export default function DashboardSettings() {
     setProfileSaving(true)
     setProfileMsg(null)
     try {
-      await updateProfile({ name, username, title, description: bio, isPublic })
+      await updateProfile({ name, username, title, description: bio, accountType, isPublic })
       setProfileMsg({ type: 'success', text: 'Profile saved.' })
       setTimeout(() => setProfileMsg(null), 3000)
     } catch (e) {
@@ -193,6 +195,30 @@ export default function DashboardSettings() {
             {activeTab === 'profile' && (
               <div className="bg-white rounded-xl border border-[var(--border)] p-6 space-y-4">
                 <h2 className="text-sm font-semibold text-[var(--text-primary)]">Public profile</h2>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-2">Account type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { key: 'professional' as AccountType, label: 'Professional', icon: BriefcaseBusiness },
+                      { key: 'lecturer' as AccountType,     label: 'Lecturer',     icon: GraduationCap },
+                    ]).map(({ key, label, icon: Icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setAccountType(key)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                          accountType === key
+                            ? 'border-gray-900 bg-gray-50 text-gray-900'
+                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon style={{ width: 14, height: 14 }} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>

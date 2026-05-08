@@ -1,3 +1,5 @@
+export type AccountType = 'lecturer' | 'professional'
+
 export interface LecturerProfile {
   id: string
   userId?: string
@@ -7,6 +9,7 @@ export interface LecturerProfile {
   title?: string
   classGroup?: string
   description?: string
+  accountType: AccountType
   isPublic: boolean
   createdAt: string
 }

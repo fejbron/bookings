@@ -10,6 +10,7 @@ export interface LecturerProfileRow {
   title: string | null
   description: string | null
   class_group: string | null
+  account_type: 'lecturer' | 'professional'
   is_public: boolean
   created_at: string
 }

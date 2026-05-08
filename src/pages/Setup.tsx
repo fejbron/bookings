@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, User, AtSign, Briefcase, FileText, AlertCircle, Check } from 'lucide-react'
+import { CalendarDays, User, AtSign, Briefcase, FileText, AlertCircle, Check, GraduationCap, BriefcaseBusiness } from 'lucide-react'
 import { useAuth } from '../hooks'
+import type { AccountType } from '../types'
 
 function slugify(v: string) {
   return v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -11,6 +12,7 @@ export default function Setup() {
   const { createProfile, user } = useAuth()
   const navigate = useNavigate()
 
+  const [accountType, setAccountType] = useState<AccountType>('professional')
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [usernameManual, setUsernameManual] = useState(false)
@@ -42,7 +44,7 @@ export default function Setup() {
 
     setLoading(true)
     try {
-      await createProfile({ name: name.trim(), username, title: title.trim(), description: bio.trim() })
+      await createProfile({ name: name.trim(), username, accountType, title: title.trim(), description: bio.trim() })
       navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -73,6 +75,31 @@ export default function Setup() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-2">I am a *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: 'professional' as AccountType, label: 'Professional', icon: BriefcaseBusiness, hint: 'Consultant, designer, advisor' },
+                { key: 'lecturer' as AccountType,     label: 'Lecturer',     icon: GraduationCap,     hint: 'Teacher with student bookings' },
+              ]).map(({ key, label, icon: Icon, hint }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setAccountType(key)}
+                  className={`text-left p-3 rounded-xl border-2 transition-all ${
+                    accountType === key
+                      ? 'border-gray-900 bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon style={{ width: 16, height: 16 }} className={accountType === key ? 'text-gray-900' : 'text-gray-400'} />
+                  <p className={`mt-1.5 text-sm font-semibold ${accountType === key ? 'text-gray-900' : 'text-gray-700'}`}>{label}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{hint}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">Full name *</label>
             <div className="relative">

@@ -51,8 +51,8 @@ interface AppContextValue {
   signUp: (email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
   changePassword: (current: string, next: string) => Promise<string | null>
-  createProfile: (input: { name: string; username: string; title?: string; description?: string }) => Promise<void>
-  updateProfile: (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'isPublic'>>) => Promise<void>
+  createProfile: (input: { name: string; username: string; accountType: 'lecturer' | 'professional'; title?: string; description?: string }) => Promise<void>
+  updateProfile: (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'accountType' | 'isPublic'>>) => Promise<void>
 
   // Account switching
   switchAccount: (userId: string) => void
@@ -203,7 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return error?.message ?? null
   }, [user])
 
-  const createProfile = useCallback(async (input: { name: string; username: string; title?: string; description?: string }) => {
+  const createProfile = useCallback(async (input: { name: string; username: string; accountType: 'lecturer' | 'professional'; title?: string; description?: string }) => {
     if (!user) throw new Error('Not authenticated')
     const taken = await q.isUsernameTaken(input.username.trim().toLowerCase())
     if (taken) throw new Error('That username is already taken.')
@@ -212,7 +212,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveUserId(user.id)
   }, [user])
 
-  const updateProfile = useCallback(async (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'isPublic'>>) => {
+  const updateProfile = useCallback(async (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'accountType' | 'isPublic'>>) => {
     if (!user) throw new Error('Not authenticated')
     if (input.username && input.username !== profile?.username) {
       const taken = await q.isUsernameTaken(input.username.trim().toLowerCase())

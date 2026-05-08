@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Clock, Search, LogIn } from 'lucide-react'
+import { CalendarDays, Clock, Search, LogIn, GraduationCap } from 'lucide-react'
 import { getDirectoryListing } from '../lib/db/queries'
 import { ErrorState } from '../components/ui/States'
 import type { LecturerProfile } from '../types'
@@ -156,7 +156,14 @@ export default function Home() {
                   <div className="flex items-start gap-3 mb-3">
                     <Avatar name={profile.name} size={12} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold text-gray-900 truncate">{profile.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[15px] font-semibold text-gray-900 truncate">{profile.name}</p>
+                        {profile.accountType === 'lecturer' && (
+                          <span title="Lecturer" className="inline-flex items-center justify-center w-4 h-4 rounded text-blue-600 bg-blue-50 border border-blue-100 shrink-0">
+                            <GraduationCap style={{ width: 10, height: 10 }} />
+                          </span>
+                        )}
+                      </div>
                       {profile.title && (
                         <p className="text-xs text-gray-400 mt-0.5 truncate">{profile.title}</p>
                       )}
