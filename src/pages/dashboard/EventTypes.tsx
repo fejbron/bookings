@@ -32,10 +32,22 @@ function CopyLinkButton({ url }: { url: string }) {
   )
 }
 
-function TypeCard({ type, onDelete, bookingUrl }: { type: CalendarTypeRecord; onDelete: () => void; bookingUrl: string }) {
+function TypeCard({ type, onDelete, onTogglePresentation, bookingUrl }: {
+  type: CalendarTypeRecord
+  onDelete: () => void
+  onTogglePresentation: (next: boolean) => Promise<void>
+  bookingUrl: string
+}) {
   const [showDelete, setShowDelete] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const bg = COLOR_BG[type.color] ?? '#4B5563'
   const light = COLOR_LIGHT[type.color] ?? '#F3F4F6'
+
+  async function handleToggle() {
+    setToggling(true)
+    try { await onTogglePresentation(!type.isPresentation) }
+    finally { setToggling(false) }
+  }
 
   return (
     <div className="bg-white rounded-xl border border-[var(--border)] p-5 flex flex-col gap-4 hover:shadow-sm transition-shadow">
@@ -61,6 +73,24 @@ function TypeCard({ type, onDelete, bookingUrl }: { type: CalendarTypeRecord; on
         <div className="w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0" style={{ background: bg }} />
       </div>
 
+      <button
+        onClick={handleToggle}
+        disabled={toggling}
+        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs transition-colors disabled:opacity-50 ${
+          type.isPresentation
+            ? 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100'
+            : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'
+        }`}
+      >
+        <span className="flex items-center gap-1.5 text-left">
+          <GraduationCap style={{ width: 12, height: 12 }} />
+          {type.isPresentation ? 'Collects student roster for scoring' : 'Tap to enable student scoring'}
+        </span>
+        <span className={`inline-block w-7 h-4 rounded-full relative transition-colors ${type.isPresentation ? 'bg-blue-500' : 'bg-gray-300'}`}>
+          <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${type.isPresentation ? 'left-3.5' : 'left-0.5'}`} />
+        </span>
+      </button>
+
       <div className="flex items-center justify-between border-t border-[var(--border)] pt-3 -mt-1">
         <CopyLinkButton url={bookingUrl} />
         {showDelete ? (
@@ -80,7 +110,7 @@ function TypeCard({ type, onDelete, bookingUrl }: { type: CalendarTypeRecord; on
 }
 
 export default function DashboardEventTypes() {
-  const { types: calendarTypeRecords, create: addCalendarType, remove: deleteCalendarType } = useEventTypes()
+  const { types: calendarTypeRecords, create: addCalendarType, update: updateCalendarType, remove: deleteCalendarType } = useEventTypes()
   const { profile } = useAuth()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -198,6 +228,7 @@ export default function DashboardEventTypes() {
                 type={type}
                 bookingUrl={`${baseUrl}?type=${encodeURIComponent(type.name)}`}
                 onDelete={() => deleteCalendarType(type.id)}
+                onTogglePresentation={(next) => updateCalendarType(type.id, { isPresentation: next })}
               />
             ))}
           </div>

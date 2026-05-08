@@ -63,6 +63,7 @@ interface AppContextValue {
 
   // Calendar types
   createCalendarType: (input: { name: string; color: string; description?: string; isPresentation?: boolean }) => Promise<CalendarTypeRecord>
+  updateCalendarType: (id: string, patch: { name?: string; color?: string; description?: string; isPresentation?: boolean }) => Promise<void>
   deleteCalendarType: (id: string) => Promise<void>
 
   // Slots
@@ -255,6 +256,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return next
   }, [activeUserId])
 
+  const updateCalendarType = useCallback(async (id: string, patch: { name?: string; color?: string; description?: string; isPresentation?: boolean }) => {
+    const next = await m.updateCalendarType({ id, ...patch })
+    setAccount((prev) => ({
+      ...prev,
+      calendarTypes: prev.calendarTypes.map((t) => t.id === id ? next : t),
+    }))
+  }, [])
+
   const deleteCalendarType = useCallback(async (id: string) => {
     await m.deleteCalendarType(id)
     setAccount((prev) => ({ ...prev, calendarTypes: prev.calendarTypes.filter((t) => t.id !== id) }))
@@ -383,7 +392,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signIn, signUp, signOut, changePassword, createProfile, updateProfile,
     switchAccount,
     inviteTeamMember, removeTeamMember,
-    createCalendarType, deleteCalendarType,
+    createCalendarType, updateCalendarType, deleteCalendarType,
     generateSlots, deleteSlot, clearAllSlots,
     confirmBooking, cancelBooking, rescheduleBooking, setBookingComment, setBookingStudents, refetchAccount,
     saveSettings,

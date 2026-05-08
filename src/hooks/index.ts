@@ -72,6 +72,7 @@ export function useEventTypes() {
     loading: a.dataLoading,
     error: a.dataError,
     create: a.createCalendarType,
+    update: a.updateCalendarType,
     remove: a.deleteCalendarType,
   }
 }

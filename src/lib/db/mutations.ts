@@ -92,6 +92,27 @@ export async function deleteCalendarType(id: string): Promise<void> {
   if (error) throw new DbError('deleteCalendarType', error)
 }
 
+export interface UpdateCalendarTypeInput {
+  id: string
+  name?: string
+  color?: string
+  description?: string
+  isPresentation?: boolean
+}
+
+export async function updateCalendarType(input: UpdateCalendarTypeInput): Promise<CalendarTypeRecord> {
+  const patch: Record<string, unknown> = {}
+  if (input.name !== undefined)            patch.name = input.name.trim()
+  if (input.color !== undefined)           patch.color = input.color
+  if (input.description !== undefined)     patch.description = input.description.trim() || null
+  if (input.isPresentation !== undefined)  patch.is_presentation = input.isPresentation
+
+  const { data, error } = await supabase
+    .from('calendar_types').update(patch).eq('id', input.id).select('*').single()
+  if (error) throw new DbError('updateCalendarType', error)
+  return toCalendarType(data)
+}
+
 // Slots ────────────────────────────────────────────────────────────────────────
 
 export interface GenerateSlotsInput {
