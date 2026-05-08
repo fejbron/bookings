@@ -90,7 +90,7 @@ export default function UserPage() {
         bookings = (bookingData ?? []).map((r) => ({
           id: r.id, slotId: r.slot_id, date: '', time: '', duration: 0,
           studentName: '', studentEmail: '', presentationTopic: '', notes: '',
-          status: r.status, adminComment: '', cancellationReason: '', createdAt: '',
+          status: r.status, adminComment: '', cancellationReason: '', students: [], createdAt: '',
         }))
       }
 

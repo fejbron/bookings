@@ -10,7 +10,7 @@ type Tab = 'upcoming' | 'cancelled'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, hostUserId: r.host_user_id ?? undefined, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', createdAt: r.created_at }
+  return { id: r.id, slotId: r.slot_id, hostUserId: r.host_user_id ?? undefined, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', students: Array.isArray(r.students) ? r.students : [], createdAt: r.created_at }
 }
 
 export default function MyBookings() {
