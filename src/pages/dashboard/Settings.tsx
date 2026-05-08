@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User, Users, Trash2, UserPlus } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { useBookings } from '../../context/BookingContext'
+import { useAuth, useAccount, useSettings } from '../../hooks'
 import { saveEmailConfig, clearEmailConfig, getEmailConfig, isEmailConfigured, sendBookingConfirmationEmail } from '../../lib/email'
 
 type Tab = 'profile' | 'general' | 'email' | 'security' | 'team'
@@ -18,8 +17,9 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 const inputCls = "w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition"
 
 export default function DashboardSettings() {
-  const { profile, updateProfile, changePassword, user, teamMembers, inviteTeamMember, removeTeamMember, isManagingOther } = useAuth()
-  const { userSettings, updateUserSettings } = useBookings()
+  const { profile, updateProfile, changePassword, user } = useAuth()
+  const { teamMembers, inviteTeamMember, removeTeamMember, isManagingOther } = useAccount()
+  const { settings: userSettings, save: saveSettings } = useSettings()
 
   const [activeTab, setActiveTab] = useState<Tab>('profile')
 
@@ -80,7 +80,7 @@ export default function DashboardSettings() {
   }
 
   async function handleSaveGeneral() {
-    await updateUserSettings({ welcomeMessage: welcomeMsg, allowSelfCancel: allowCancel })
+    await saveSettings(welcomeMsg, allowCancel)
     setGeneralSaved(true)
     setTimeout(() => setGeneralSaved(false), 2500)
   }

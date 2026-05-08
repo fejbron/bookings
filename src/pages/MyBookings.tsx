@@ -2,22 +2,20 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, formatDistanceToNow } from 'date-fns'
 import { ArrowRight, Clock, Inbox, Search, X, AlertCircle, Timer, CalendarDays } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { getBookingsByEmail } from '../lib/db/queries'
+import { setBookingStatus } from '../lib/db/mutations'
 import { formatTime } from '../components/TimeSlots'
+import { ErrorState } from '../components/ui/States'
 import type { Booking } from '../types'
 
 type Tab = 'upcoming' | 'cancelled'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, hostUserId: r.host_user_id ?? undefined, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', students: Array.isArray(r.students) ? r.students : [], createdAt: r.created_at }
-}
 
 export default function MyBookings() {
   const [email, setEmail] = useState('')
   const [submittedEmail, setSubmittedEmail] = useState('')
   const [bookings, setBookings] = useState<Booking[]>([])
   const [searching, setSearching] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('upcoming')
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -27,21 +25,28 @@ export default function MyBookings() {
     const q = email.trim().toLowerCase()
     if (!q) return
     setSearching(true)
-    const { data } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('student_email', q)
-      .order('date')
-    setBookings((data ?? []).map(toBooking))
-    setSubmittedEmail(q)
-    setSearching(false)
+    setError(null)
+    try {
+      const result = await getBookingsByEmail(q)
+      setBookings(result)
+      setSubmittedEmail(q)
+    } catch (err) {
+      setError(err as Error)
+    } finally {
+      setSearching(false)
+    }
   }
 
   async function handleCancel(id: string) {
-    await supabase.from('bookings').update({ status: 'cancelled', cancellation_reason: cancelReason.trim() || null }).eq('id', id)
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const, cancellationReason: cancelReason.trim() } : b))
-    setCancelConfirmId(null)
-    setCancelReason('')
+    try {
+      const reason = cancelReason.trim() || undefined
+      await setBookingStatus(id, 'cancelled', reason)
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const, cancellationReason: reason ?? '' } : b))
+      setCancelConfirmId(null)
+      setCancelReason('')
+    } catch (err) {
+      setError(err as Error)
+    }
   }
 
   function getCountdown(dateStr: string, timeStr: string) {
@@ -102,8 +107,10 @@ export default function MyBookings() {
           </div>
         </form>
 
+        {error && <div className="mb-6"><ErrorState error={error} retry={() => setError(null)} /></div>}
+
         {/* No results */}
-        {submittedEmail && bookings.length === 0 && !searching && (
+        {submittedEmail && bookings.length === 0 && !searching && !error && (
           <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
             <Inbox className="w-10 h-10 text-gray-200 mx-auto mb-4" />
             <h2 className="text-base font-semibold text-gray-900">No bookings found</h2>

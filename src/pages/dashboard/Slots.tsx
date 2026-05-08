@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
 import { Plus, Trash2, Calendar, Clock, AlertTriangle, Info, Users, ChevronDown, X } from 'lucide-react'
-import { useBookings } from '../../context/BookingContext'
+import { useSlots, useBookings, useEventTypes } from '../../hooks'
 import { formatTime } from '../../components/TimeSlots'
 import type { CalendarTypeRecord } from '../../types'
 
 export default function DashboardSlots() {
-  const { slots, bookings, slotConfigs, calendarTypeRecords, generateSlots, removeSlot, clearAllSlots, addCalendarType, deleteCalendarType } = useBookings()
+  const { slots, slotConfigs, generate: generateSlots, remove: removeSlot, clearAll: clearAllSlots } = useSlots()
+  const { bookings } = useBookings()
+  const { types: calendarTypeRecords, create: addCalendarType, remove: deleteCalendarType } = useEventTypes()
 
   const [calendarType, setCalendarType] = useState('')
   const [showAddType, setShowAddType] = useState(false)
@@ -115,7 +117,7 @@ export default function DashboardSlots() {
     setAddTypeLoading(true)
     setAddTypeError('')
     try {
-      const created = await addCalendarType(name, newTypeColor)
+      const created = await addCalendarType({ name, color: newTypeColor })
       setCalendarType(created.name)
       setNewTypeName(''); setNewTypeColor('blue'); setShowAddType(false)
     } catch (err) {

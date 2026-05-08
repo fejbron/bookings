@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2, Check, Clock, GraduationCap } from 'lucide-react'
-import { useBookings } from '../../context/BookingContext'
-import { useAuth } from '../../context/AuthContext'
+import { useEventTypes, useAuth } from '../../hooks'
 import type { CalendarTypeRecord } from '../../types'
 
 const COLOR_OPTIONS = [
@@ -81,7 +80,7 @@ function TypeCard({ type, onDelete, bookingUrl }: { type: CalendarTypeRecord; on
 }
 
 export default function DashboardEventTypes() {
-  const { calendarTypeRecords, addCalendarType, deleteCalendarType } = useBookings()
+  const { types: calendarTypeRecords, create: addCalendarType, remove: deleteCalendarType } = useEventTypes()
   const { profile } = useAuth()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -104,7 +103,7 @@ export default function DashboardEventTypes() {
     setLoading(true)
     setError('')
     try {
-      await addCalendarType(name, newColor, newDesc.trim() || undefined, newIsPresentation)
+      await addCalendarType({ name, color: newColor, description: newDesc.trim() || undefined, isPresentation: newIsPresentation })
       setNewName(''); setNewColor('blue'); setNewDesc(''); setNewIsPresentation(false); setShowNew(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create.')

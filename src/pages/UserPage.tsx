@@ -5,10 +5,12 @@ import {
   Check, Clock, CalendarDays, Mail, User, AlertCircle,
   ChevronLeft, Globe, Zap, Plus, Trash2, GraduationCap,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { getPublicPageData, isSlotTaken } from '../lib/db/queries'
+import { createBooking } from '../lib/db/mutations'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
-import type { LecturerProfile, PresentationSlot, CalendarTypeRecord, Booking, BookingStudent } from '../types'
+import { LoadingState } from '../components/ui/States'
+import type { LecturerProfile, PresentationSlot, CalendarTypeRecord, BookingStudent } from '../types'
 
 const COLOR_BG: Record<string, string> = {
   blue: '#006BFF', purple: '#7C3AED', green: '#059669',
@@ -21,7 +23,7 @@ interface PageData {
   profile: LecturerProfile
   slots: PresentationSlot[]
   calendarTypes: CalendarTypeRecord[]
-  bookings: Booking[]
+  takenSlotIds: Set<string>
   welcomeMessage: string
 }
 
@@ -44,69 +46,22 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!username) return
+    let mounted = true
     async function load() {
-      const { data: profileRow } = await supabase
-        .from('lecturer_profiles')
-        .select('*')
-        .eq('username', username)
-        .eq('is_public', true)
-        .maybeSingle()
-
-      if (!profileRow) { setNotFound(true); setLoading(false); return }
-
-      const profile: LecturerProfile = {
-        id: profileRow.id,
-        userId: profileRow.user_id ?? undefined,
-        username: profileRow.username ?? undefined,
-        name: profileRow.name,
-        email: profileRow.email,
-        title: profileRow.title ?? undefined,
-        classGroup: profileRow.class_group ?? undefined,
-        description: profileRow.description ?? undefined,
-        isPublic: profileRow.is_public ?? true,
-        createdAt: profileRow.created_at,
+      try {
+        const today = new Date().toISOString().slice(0, 10)
+        const result = await getPublicPageData(username!, today)
+        if (!mounted) return
+        if (!result) { setNotFound(true); return }
+        setPageData(result)
+      } catch {
+        if (mounted) setNotFound(true)
+      } finally {
+        if (mounted) setLoading(false)
       }
-
-      const today = new Date().toISOString().slice(0, 10)
-      const [slotsRes, calTypesRes, settingsRes] = await Promise.all([
-        supabase.from('slots').select('*').eq('user_id', profileRow.user_id).gte('date', today).order('date').order('time'),
-        supabase.from('calendar_types').select('*').eq('user_id', profileRow.user_id).order('created_at'),
-        supabase.from('admin_settings').select('welcome_message').eq('user_id', profileRow.user_id).maybeSingle(),
-      ])
-
-      const slots: PresentationSlot[] = (slotsRes.data ?? []).map((r) => ({
-        id: r.id, userId: r.user_id ?? undefined, date: r.date, time: r.time,
-        duration: r.duration, calendarType: r.calendar_type ?? 'General', classGroup: r.class_group ?? undefined,
-      }))
-
-      const slotIds = slots.map(s => s.id)
-      let bookings: Booking[] = []
-      if (slotIds.length > 0) {
-        const { data: bookingData } = await supabase
-          .from('bookings')
-          .select('id, slot_id, status')
-          .in('slot_id', slotIds)
-          .in('status', ['confirmed', 'pending'])
-        bookings = (bookingData ?? []).map((r) => ({
-          id: r.id, slotId: r.slot_id, date: '', time: '', duration: 0,
-          studentName: '', studentEmail: '', presentationTopic: '', notes: '',
-          status: r.status, adminComment: '', cancellationReason: '', students: [], createdAt: '',
-        }))
-      }
-
-      setPageData({
-        profile,
-        slots,
-        calendarTypes: (calTypesRes.data ?? []).map((r) => ({
-          id: r.id, userId: r.user_id ?? undefined, name: r.name, color: r.color ?? 'blue',
-          description: r.description ?? undefined, isPresentation: r.is_presentation ?? false, createdAt: r.created_at,
-        })),
-        bookings,
-        welcomeMessage: settingsRes.data?.welcome_message ?? '',
-      })
-      setLoading(false)
     }
     load()
+    return () => { mounted = false }
   }, [username])
 
   // Booking state
@@ -124,14 +79,9 @@ export default function UserPage() {
   const [bookingError, setBookingError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const bookedSlotIds = useMemo(
-    () => new Set(pageData?.bookings.map(b => b.slotId) ?? []),
-    [pageData]
-  )
-
   const availableSlots = useMemo(
-    () => (pageData?.slots ?? []).filter(s => !bookedSlotIds.has(s.id)),
-    [pageData, bookedSlotIds]
+    () => (pageData?.slots ?? []).filter(s => !pageData?.takenSlotIds.has(s.id)),
+    [pageData]
   )
 
   const calendarTypes = useMemo(() => {
@@ -204,33 +154,26 @@ export default function UserPage() {
     try {
       const slot = pageData.slots.find(s => s.id === slotId)!
 
-      const { data: taken } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('slot_id', slotId)
-        .in('status', ['confirmed', 'pending'])
-        .maybeSingle()
-      if (taken) throw new Error('This slot was just taken. Please pick another time.')
+      if (await isSlotTaken(slotId)) {
+        throw new Error('This slot was just taken. Please pick another time.')
+      }
 
-      const validStudents = isPresentation
+      const validStudents: BookingStudent[] = isPresentation
         ? students.filter(s => s.name.trim() && s.indexNumber.trim()).map(s => ({ name: s.name.trim(), indexNumber: s.indexNumber.trim(), score: null }))
         : []
 
-      const { error } = await supabase.from('bookings').insert({
-        id: crypto.randomUUID(),
-        slot_id: slotId,
-        host_user_id: pageData.profile.userId ?? null,
+      await createBooking({
+        slotId,
+        hostUserId: pageData.profile.userId ?? null,
         date: slot.date,
         time: slot.time,
         duration: slot.duration,
-        student_name: name.trim(),
-        student_email: email.trim().toLowerCase(),
-        presentation_topic: isTopicHidden ? (calendarType ?? 'Meeting') : topic.trim(),
-        notes: notes.trim(),
-        status: 'pending',
+        studentName: name,
+        studentEmail: email,
+        presentationTopic: isTopicHidden ? (calendarType ?? 'Meeting') : topic,
+        notes,
         students: validStudents,
       })
-      if (error) throw new Error(error.message)
       setSubmitted(true)
     } catch (err) {
       setBookingError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -249,13 +192,8 @@ export default function UserPage() {
   }
 
   // ── Loading / not found ──────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <LoadingState fullscreen dark />
+
 
   if (notFound || !pageData) {
     return (

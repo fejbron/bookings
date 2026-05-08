@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, User, AtSign, Briefcase, FileText, AlertCircle, Check } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../hooks'
 
 function slugify(v: string) {
   return v.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')

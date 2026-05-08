@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Search, Download, X, MessageSquare, CheckCircle, AlertCircle, GraduationCap, Save, Check } from 'lucide-react'
-import { useBookings } from '../../context/BookingContext'
+import { useBookings, useSlots, useEventTypes } from '../../hooks'
+import { exportBookingsCSV } from '../../lib/csv'
 import { formatTime } from '../../components/TimeSlots'
+import { ErrorState } from '../../components/ui/States'
 import type { Booking, BookingStudent } from '../../types'
 
 const COLOR_BADGE: Record<string, string> = {
@@ -15,7 +17,9 @@ const COLOR_BADGE: Record<string, string> = {
 type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function DashboardBookings() {
-  const { bookings, slots, calendarTypeRecords, confirmBooking, cancelBooking, addAdminComment, rescheduleBooking, getAvailableSlots, exportBookingsCSV, updateBookingStudents } = useBookings()
+  const { bookings, error, confirm, cancel, reschedule, setComment, setStudents } = useBookings()
+  const { slots, getAvailableSlots } = useSlots()
+  const { types: calendarTypeRecords } = useEventTypes()
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [search, setSearch] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -57,12 +61,12 @@ export default function DashboardBookings() {
   }, [bookings, filter, search, today])
 
   async function handleConfirm(id: string) {
-    await confirmBooking(id)
+    await confirm(id)
     setSelectedBooking(prev => prev?.id === id ? { ...prev, status: 'confirmed' } : prev)
   }
 
   async function handleCancel(id: string) {
-    await cancelBooking(id)
+    await cancel(id)
     setSelectedBooking(prev => prev?.id === id ? { ...prev, status: 'cancelled' } : prev)
   }
 
@@ -70,7 +74,7 @@ export default function DashboardBookings() {
     if (!selectedBooking) return
     setCommentLoading(true)
     try {
-      await addAdminComment(selectedBooking.id, commentDraft)
+      await setComment(selectedBooking.id, commentDraft)
       setSelectedBooking(prev => prev ? { ...prev, adminComment: commentDraft } : prev)
     } finally {
       setCommentLoading(false)
@@ -87,7 +91,7 @@ export default function DashboardBookings() {
     setRescheduleLoading(true)
     setRescheduleError('')
     try {
-      await rescheduleBooking(selectedBooking.id, rescheduleSlotId)
+      await reschedule(selectedBooking.id, rescheduleSlotId)
       const newSlot = slots.find(s => s.id === rescheduleSlotId)
       if (newSlot) setSelectedBooking(prev => prev ? { ...prev, slotId: rescheduleSlotId, date: newSlot.date, time: newSlot.time, duration: newSlot.duration } : prev)
       setRescheduleDate(''); setRescheduleSlotId('')
@@ -110,7 +114,7 @@ export default function DashboardBookings() {
     if (!selectedBooking) return
     setScoresLoading(true)
     try {
-      await updateBookingStudents(selectedBooking.id, scoreDraft)
+      await setStudents(selectedBooking.id, scoreDraft)
       setSelectedBooking(prev => prev ? { ...prev, students: scoreDraft } : prev)
       setScoresSaved(true)
       setTimeout(() => setScoresSaved(false), 3000)
@@ -139,13 +143,15 @@ export default function DashboardBookings() {
             <p className="text-sm text-[var(--text-secondary)] mt-0.5">{confirmedCount} confirmed · {pendingCount} pending</p>
           </div>
           <button
-            onClick={exportBookingsCSV}
+            onClick={() => exportBookingsCSV(bookings)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-white transition-colors"
           >
             <Download style={{ width: 15, height: 15 }} />
             Export CSV
           </button>
         </div>
+
+        {error && <div className="mb-5"><ErrorState error={error} /></div>}
 
         {/* Tabs + search */}
         <div className="flex items-center gap-4 mb-5 flex-wrap">

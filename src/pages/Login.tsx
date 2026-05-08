@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { CalendarDays, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../hooks'
 
 type Mode = 'signin' | 'signup'
 

@@ -4,8 +4,7 @@ import {
   CalendarDays, LayoutGrid, Clock, Settings, LogOut,
   Menu, X, ExternalLink, Copy, Check, BookOpen, ChevronDown, Users,
 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { useBookings } from '../../context/BookingContext'
+import { useAuth, useAccount, useBookings } from '../../hooks'
 import { format } from 'date-fns'
 
 const NAV = [
@@ -31,7 +30,8 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function AccountSwitcher() {
-  const { user, profile, activeUserId, managedAccounts, switchAccount, isManagingOther } = useAuth()
+  const { user, profile } = useAuth()
+  const { activeUserId, managedAccounts, switchAccount, isManagingOther } = useAccount()
   const [open, setOpen] = useState(false)
 
   if (managedAccounts.length === 0) return null
@@ -98,7 +98,8 @@ function AccountSwitcher() {
 }
 
 export default function DashboardLayout() {
-  const { profile, activeProfile, isManagingOther, signOut } = useAuth()
+  const { profile, signOut } = useAuth()
+  const { activeProfile, isManagingOther } = useAccount()
   const { bookings } = useBookings()
   const { pathname } = useLocation()
   const navigate = useNavigate()

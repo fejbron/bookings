@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, Clock, Search, LogIn } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { getDirectoryListing } from '../lib/db/queries'
+import { ErrorState } from '../components/ui/States'
 import type { LecturerProfile } from '../types'
 
 function Avatar({ name, size = 12 }: { name: string; size?: number }) {
@@ -22,53 +23,26 @@ interface PublicProfile extends LecturerProfile {
 export default function Home() {
   const [profiles, setProfiles] = useState<PublicProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
+    let mounted = true
     async function load() {
-      const { data: profileData } = await supabase
-        .from('lecturer_profiles')
-        .select('*')
-        .eq('is_public', true)
-        .not('username', 'is', null)
-        .order('name')
-
-      if (!profileData) { setLoading(false); return }
-
-      const today = new Date().toISOString().slice(0, 10)
-      const userIds = profileData.map((p: Record<string, unknown>) => p.user_id).filter(Boolean) as string[]
-
-      let slotCounts: Record<string, number> = {}
-      if (userIds.length > 0) {
-        const { data: slotData } = await supabase
-          .from('slots')
-          .select('user_id')
-          .in('user_id', userIds)
-          .gte('date', today)
-
-        if (slotData) {
-          for (const slot of slotData) {
-            slotCounts[slot.user_id] = (slotCounts[slot.user_id] ?? 0) + 1
-          }
-        }
+      try {
+        const today = new Date().toISOString().slice(0, 10)
+        const listing = await getDirectoryListing(today)
+        if (!mounted) return
+        setProfiles(listing.map(({ profile, slotCount }) => ({ ...profile, slotCount })))
+        setError(null)
+      } catch (err) {
+        if (mounted) setError(err as Error)
+      } finally {
+        if (mounted) setLoading(false)
       }
-
-      setProfiles(profileData.map((p: Record<string, unknown>) => ({
-        id: p.id as string,
-        userId: p.user_id as string | undefined,
-        username: p.username as string | undefined,
-        name: p.name as string,
-        email: p.email as string,
-        title: p.title as string | undefined,
-        classGroup: p.class_group as string | undefined,
-        description: p.description as string | undefined,
-        isPublic: (p.is_public as boolean) ?? true,
-        createdAt: p.created_at as string,
-        slotCount: p.user_id ? (slotCounts[p.user_id as string] ?? 0) : 0,
-      })))
-      setLoading(false)
     }
     load()
+    return () => { mounted = false }
   }, [])
 
   const filtered = profiles.filter(p =>
@@ -131,7 +105,9 @@ export default function Home() {
 
       {/* Directory */}
       <div className="max-w-5xl mx-auto px-6 py-10">
-        {loading ? (
+        {error ? (
+          <ErrorState error={error} retry={() => window.location.reload()} />
+        ) : loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse">
