@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, Check, Clock } from 'lucide-react'
+import { Plus, Trash2, Check, Clock, GraduationCap } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { useAuth } from '../../context/AuthContext'
 import type { CalendarTypeRecord } from '../../types'
@@ -46,7 +46,14 @@ function TypeCard({ type, onDelete, bookingUrl }: { type: CalendarTypeRecord; on
             <Clock style={{ width: 16, height: 16, color: bg }} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{type.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{type.name}</h3>
+              {type.isPresentation && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+                  <GraduationCap style={{ width: 10, height: 10 }} /> Presentation
+                </span>
+              )}
+            </div>
             {type.description && (
               <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{type.description}</p>
             )}
@@ -80,6 +87,7 @@ export default function DashboardEventTypes() {
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('blue')
   const [newDesc, setNewDesc] = useState('')
+  const [newIsPresentation, setNewIsPresentation] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -96,8 +104,8 @@ export default function DashboardEventTypes() {
     setLoading(true)
     setError('')
     try {
-      await addCalendarType(name, newColor, newDesc.trim() || undefined)
-      setNewName(''); setNewColor('blue'); setNewDesc(''); setShowNew(false)
+      await addCalendarType(name, newColor, newDesc.trim() || undefined, newIsPresentation)
+      setNewName(''); setNewColor('blue'); setNewDesc(''); setNewIsPresentation(false); setShowNew(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create.')
     } finally {
@@ -150,12 +158,22 @@ export default function DashboardEventTypes() {
                   ))}
                 </div>
               </div>
+              <div className="flex items-center justify-between py-2 border border-[var(--border)] rounded-lg px-3">
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Presentation type</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">Booking form will collect a student roster with index numbers for scoring</p>
+                </div>
+                <label className="toggle cursor-pointer ml-4 shrink-0">
+                  <input type="checkbox" checked={newIsPresentation} onChange={e => setNewIsPresentation(e.target.checked)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
               {error && <p className="text-xs text-red-500">{error}</p>}
               <div className="flex gap-2">
                 <button onClick={handleCreate} disabled={!newName.trim() || loading} className="px-5 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   {loading ? 'Creating…' : 'Create'}
                 </button>
-                <button onClick={() => { setShowNew(false); setError(''); setNewName(''); setNewDesc('') }} className="px-5 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-50">
+                <button onClick={() => { setShowNew(false); setError(''); setNewName(''); setNewDesc(''); setNewIsPresentation(false) }} className="px-5 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-gray-50">
                   Cancel
                 </button>
               </div>

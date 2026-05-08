@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { eachDayOfInterval, parseISO, format } from 'date-fns'
-import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord } from '../types'
+import type { PresentationSlot, SlotConfig, Booking, CalendarTypeRecord, BookingStudent } from '../types'
 import { supabase } from '../lib/supabase'
 import { sendBookingConfirmationEmail } from '../lib/email'
 import { useAuth } from './AuthContext'
@@ -25,7 +25,8 @@ interface BookingContextType {
   removeSlot: (id: string) => Promise<void>
   clearAllSlots: () => Promise<void>
 
-  addCalendarType: (name: string, color: string, description?: string) => Promise<CalendarTypeRecord>
+  addCalendarType: (name: string, color: string, description?: string, isPresentation?: boolean) => Promise<CalendarTypeRecord>
+  updateBookingStudents: (bookingId: string, students: BookingStudent[]) => Promise<void>
   deleteCalendarType: (id: string) => Promise<void>
 
   getAvailableDates: (calendarType?: string) => string[]
@@ -49,7 +50,7 @@ function toSlot(r: any): PresentationSlot {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toBooking(r: any): Booking {
-  return { id: r.id, slotId: r.slot_id, hostUserId: r.host_user_id ?? undefined, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', createdAt: r.created_at }
+  return { id: r.id, slotId: r.slot_id, hostUserId: r.host_user_id ?? undefined, date: r.date, time: r.time, duration: r.duration, studentName: r.student_name, studentEmail: r.student_email, presentationTopic: r.presentation_topic, notes: r.notes, status: r.status, adminComment: r.admin_comment ?? '', cancellationReason: r.cancellation_reason ?? '', students: Array.isArray(r.students) ? r.students : [], createdAt: r.created_at }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +60,7 @@ function toConfig(r: any): SlotConfig {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toCalendarType(r: any): CalendarTypeRecord {
-  return { id: r.id, userId: r.user_id ?? undefined, name: r.name, color: r.color ?? 'blue', description: r.description ?? undefined, createdAt: r.created_at }
+  return { id: r.id, userId: r.user_id ?? undefined, name: r.name, color: r.color ?? 'blue', description: r.description ?? undefined, isPresentation: r.is_presentation ?? false, createdAt: r.created_at }
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
@@ -220,11 +221,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setBookings(prev => prev.map(b => ({ ...b, status: 'cancelled' as const })))
   }, [userId, slots])
 
-  const addCalendarType = useCallback(async (name: string, color: string, description?: string): Promise<CalendarTypeRecord> => {
+  const addCalendarType = useCallback(async (name: string, color: string, description?: string, isPresentation?: boolean): Promise<CalendarTypeRecord> => {
     if (!userId) throw new Error('Not authenticated')
     const { data, error } = await supabase
       .from('calendar_types')
-      .insert({ id: crypto.randomUUID(), name, color, description: description?.trim() || null, user_id: userId })
+      .insert({ id: crypto.randomUUID(), name, color, description: description?.trim() || null, is_presentation: isPresentation ?? false, user_id: userId })
       .select()
       .single()
     if (error) throw new Error(error.message)
@@ -232,6 +233,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     setCalendarTypeRecords(prev => [...prev, record])
     return record
   }, [userId])
+
+  const updateBookingStudents = useCallback(async (bookingId: string, students: BookingStudent[]) => {
+    const { error } = await supabase.from('bookings').update({ students }).eq('id', bookingId)
+    if (error) throw new Error(error.message)
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, students } : b))
+  }, [])
 
   const deleteCalendarType = useCallback(async (id: string) => {
     const { error } = await supabase.from('calendar_types').delete().eq('id', id)
@@ -319,7 +326,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     <BookingContext.Provider value={{
       slots, bookings, slotConfigs, calendarTypeRecords, userSettings, loading, userId: userId ?? null,
       generateSlots, removeSlot, clearAllSlots,
-      addCalendarType, deleteCalendarType,
+      addCalendarType, deleteCalendarType, updateBookingStudents,
       getAvailableDates, getAvailableSlots,
       confirmBooking, cancelBooking, rescheduleBooking, addAdminComment, exportBookingsCSV,
       updateUserSettings,

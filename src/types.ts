@@ -11,12 +11,19 @@ export interface LecturerProfile {
   createdAt: string
 }
 
+export interface BookingStudent {
+  name: string
+  indexNumber: string
+  score?: number | null
+}
+
 export interface CalendarTypeRecord {
   id: string
   userId?: string
   name: string
   color: string
   description?: string
+  isPresentation: boolean
   createdAt: string
 }
 
@@ -78,5 +85,6 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled'
   adminComment: string
   cancellationReason: string
+  students: BookingStudent[]
   createdAt: string
 }

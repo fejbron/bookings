@@ -3,12 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
   Check, Clock, CalendarDays, Mail, User, AlertCircle,
-  ChevronLeft, Globe, Zap,
+  ChevronLeft, Globe, Zap, Plus, Trash2, GraduationCap,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
-import type { LecturerProfile, PresentationSlot, CalendarTypeRecord, Booking } from '../types'
+import type { LecturerProfile, PresentationSlot, CalendarTypeRecord, Booking, BookingStudent } from '../types'
 
 const COLOR_BG: Record<string, string> = {
   blue: '#006BFF', purple: '#7C3AED', green: '#059669',
@@ -99,7 +99,7 @@ export default function UserPage() {
         slots,
         calendarTypes: (calTypesRes.data ?? []).map((r) => ({
           id: r.id, userId: r.user_id ?? undefined, name: r.name, color: r.color ?? 'blue',
-          description: r.description ?? undefined, createdAt: r.created_at,
+          description: r.description ?? undefined, isPresentation: r.is_presentation ?? false, createdAt: r.created_at,
         })),
         bookings,
         welcomeMessage: settingsRes.data?.welcome_message ?? '',
@@ -118,6 +118,7 @@ export default function UserPage() {
   const [email, setEmail] = useState('')
   const [topic, setTopic] = useState('')
   const [notes, setNotes] = useState('')
+  const [students, setStudents] = useState<BookingStudent[]>([{ name: '', indexNumber: '' }])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [bookingError, setBookingError] = useState('')
@@ -169,6 +170,18 @@ export default function UserPage() {
   }
 
   const isTopicHidden = ['Office Meeting', 'Other', 'Personal'].includes(calendarType ?? '')
+  const selectedType = pageData?.calendarTypes.find(t => t.name === calendarType)
+  const isPresentation = selectedType?.isPresentation ?? false
+
+  function addStudent() {
+    setStudents(prev => [...prev, { name: '', indexNumber: '' }])
+  }
+  function removeStudent(i: number) {
+    setStudents(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateStudent(i: number, field: keyof BookingStudent, value: string) {
+    setStudents(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
+  }
 
   function validate(): boolean {
     const e: Record<string, string> = {}
@@ -176,6 +189,10 @@ export default function UserPage() {
     if (!email.trim()) e.email = 'Email is required.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = 'Enter a valid email.'
     if (!isTopicHidden && !topic.trim()) e.topic = 'Topic is required.'
+    if (isPresentation) {
+      const valid = students.some(s => s.name.trim() && s.indexNumber.trim())
+      if (!valid) e.students = 'Add at least one student with a name and index number.'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -195,6 +212,10 @@ export default function UserPage() {
         .maybeSingle()
       if (taken) throw new Error('This slot was just taken. Please pick another time.')
 
+      const validStudents = isPresentation
+        ? students.filter(s => s.name.trim() && s.indexNumber.trim()).map(s => ({ name: s.name.trim(), indexNumber: s.indexNumber.trim(), score: null }))
+        : []
+
       const { error } = await supabase.from('bookings').insert({
         id: crypto.randomUUID(),
         slot_id: slotId,
@@ -207,6 +228,7 @@ export default function UserPage() {
         presentation_topic: isTopicHidden ? (calendarType ?? 'Meeting') : topic.trim(),
         notes: notes.trim(),
         status: 'pending',
+        students: validStudents,
       })
       if (error) throw new Error(error.message)
       setSubmitted(true)
@@ -222,6 +244,7 @@ export default function UserPage() {
     setCalendarType(calendarTypes.length <= 1 ? (calendarTypes[0]?.name ?? null) : null)
     setDate(null); setSlotId(null)
     setName(''); setEmail(''); setTopic(''); setNotes('')
+    setStudents([{ name: '', indexNumber: '' }])
     setErrors({}); setBookingError(''); setSubmitted(false)
   }
 
@@ -513,6 +536,50 @@ export default function UserPage() {
                   placeholder="Anything else to share?"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-800 bg-zinc-950 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-white transition resize-none"
                 />
+              </div>
+            )}
+
+            {isPresentation && (
+              <div className="pt-2 border-t border-zinc-800">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <GraduationCap style={{ width: 14, height: 14 }} className="text-zinc-400" />
+                    <label className="text-xs font-semibold text-zinc-400">Group members</label>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addStudent}
+                    className="flex items-center gap-1 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <Plus style={{ width: 13, height: 13 }} /> Add student
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {students.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={s.name}
+                        onChange={e => { updateStudent(i, 'name', e.target.value); setErrors(prev => ({ ...prev, students: '' })) }}
+                        placeholder="Full name"
+                        className="flex-1 px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white transition"
+                      />
+                      <input
+                        type="text"
+                        value={s.indexNumber}
+                        onChange={e => { updateStudent(i, 'indexNumber', e.target.value); setErrors(prev => ({ ...prev, students: '' })) }}
+                        placeholder="Index no."
+                        className="w-28 px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-950 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-white transition"
+                      />
+                      {students.length > 1 && (
+                        <button type="button" onClick={() => removeStudent(i)} className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 transition-colors">
+                          <Trash2 style={{ width: 13, height: 13 }} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {errors.students && <p className="mt-1.5 text-xs text-red-400">{errors.students}</p>}
               </div>
             )}
           </div>

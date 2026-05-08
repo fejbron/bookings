@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Search, Download, X, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react'
+import { Search, Download, X, MessageSquare, CheckCircle, AlertCircle, GraduationCap, Save, Check } from 'lucide-react'
 import { useBookings } from '../../context/BookingContext'
 import { formatTime } from '../../components/TimeSlots'
-import type { Booking } from '../../types'
+import type { Booking, BookingStudent } from '../../types'
 
 const COLOR_BADGE: Record<string, string> = {
   blue: 'bg-blue-50 text-blue-700', purple: 'bg-purple-50 text-purple-700',
@@ -15,7 +15,7 @@ const COLOR_BADGE: Record<string, string> = {
 type TabFilter = 'upcoming' | 'pending' | 'confirmed' | 'cancelled'
 
 export default function DashboardBookings() {
-  const { bookings, slots, calendarTypeRecords, confirmBooking, cancelBooking, addAdminComment, rescheduleBooking, getAvailableSlots, exportBookingsCSV } = useBookings()
+  const { bookings, slots, calendarTypeRecords, confirmBooking, cancelBooking, addAdminComment, rescheduleBooking, getAvailableSlots, exportBookingsCSV, updateBookingStudents } = useBookings()
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [search, setSearch] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -25,6 +25,9 @@ export default function DashboardBookings() {
   const [rescheduleSlotId, setRescheduleSlotId] = useState('')
   const [rescheduleLoading, setRescheduleLoading] = useState(false)
   const [rescheduleError, setRescheduleError] = useState('')
+  const [scoreDraft, setScoreDraft] = useState<BookingStudent[]>([])
+  const [scoresLoading, setScoresLoading] = useState(false)
+  const [scoresSaved, setScoresSaved] = useState(false)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -92,6 +95,27 @@ export default function DashboardBookings() {
       setRescheduleError(e instanceof Error ? e.message : 'Failed to reschedule.')
     } finally {
       setRescheduleLoading(false)
+    }
+  }
+
+  function isCompleted(b: Booking) {
+    try {
+      const dt = parseISO(`${b.date}T${b.time}`)
+      dt.setMinutes(dt.getMinutes() + b.duration)
+      return dt < new Date()
+    } catch { return false }
+  }
+
+  async function handleSaveScores() {
+    if (!selectedBooking) return
+    setScoresLoading(true)
+    try {
+      await updateBookingStudents(selectedBooking.id, scoreDraft)
+      setSelectedBooking(prev => prev ? { ...prev, students: scoreDraft } : prev)
+      setScoresSaved(true)
+      setTimeout(() => setScoresSaved(false), 3000)
+    } finally {
+      setScoresLoading(false)
     }
   }
 
@@ -168,7 +192,7 @@ export default function DashboardBookings() {
               return (
                 <button
                   key={b.id}
-                  onClick={() => { setSelectedBooking(b); setCommentDraft(b.adminComment ?? '') }}
+                  onClick={() => { setSelectedBooking(b); setCommentDraft(b.adminComment ?? ''); setScoreDraft(b.students ?? []); setScoresSaved(false) }}
                   className={`w-full text-left bg-white rounded-xl border transition-all p-4 flex items-start gap-4 hover:shadow-sm ${isSelected ? 'border-gray-900 shadow-sm' : 'border-[var(--border)]'}`}
                 >
                   <div className="text-center shrink-0 w-10">
@@ -289,6 +313,58 @@ export default function DashboardBookings() {
                     >
                       {rescheduleLoading ? 'Rescheduling…' : 'Reschedule'}
                     </button>
+                  </div>
+                )}
+
+                {/* Student roster + scores */}
+                {selectedBooking.students && selectedBooking.students.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1">
+                        <GraduationCap style={{ width: 11, height: 11 }} /> Students
+                      </p>
+                      {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' && (
+                        <span className="text-[10px] text-blue-500 font-semibold">Enter scores</span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {scoreDraft.map((s, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-[var(--text-primary)] truncate">{s.name}</p>
+                            <p className="text-[10px] text-[var(--text-muted)]">{s.indexNumber}</p>
+                          </div>
+                          {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' ? (
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={s.score ?? ''}
+                              onChange={e => {
+                                const val = e.target.value === '' ? null : Number(e.target.value)
+                                setScoreDraft(prev => prev.map((st, idx) => idx === i ? { ...st, score: val } : st))
+                                setScoresSaved(false)
+                              }}
+                              placeholder="—"
+                              className="w-16 px-2 py-1 rounded-lg border border-[var(--border)] text-xs text-center text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white"
+                            />
+                          ) : (
+                            <span className="text-xs font-semibold text-[var(--text-primary)] w-16 text-right">
+                              {s.score != null ? s.score : '—'}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' && (
+                      <button
+                        onClick={handleSaveScores}
+                        disabled={scoresLoading}
+                        className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40"
+                      >
+                        {scoresLoading ? 'Saving…' : scoresSaved ? <><Check style={{ width: 12, height: 12 }} /> Saved</> : <><Save style={{ width: 12, height: 12 }} /> Save scores</>}
+                      </button>
+                    )}
                   </div>
                 )}
 
