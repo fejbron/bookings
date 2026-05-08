@@ -11,14 +11,32 @@ import type {
   Booking, TeamMember, ManagedAccount,
 } from '../../types'
 
+function formatCause(cause: unknown): string {
+  if (cause == null) return 'unknown error'
+  if (cause instanceof Error) return cause.message
+  if (typeof cause === 'string') return cause
+  if (typeof cause === 'object') {
+    const o = cause as Record<string, unknown>
+    // Supabase PostgrestError: { message, details, hint, code }
+    const msg = typeof o.message === 'string' ? o.message : ''
+    const details = typeof o.details === 'string' && o.details ? ` (${o.details})` : ''
+    const code = typeof o.code === 'string' && o.code ? ` [${o.code}]` : ''
+    if (msg) return msg + details + code
+    try { return JSON.stringify(cause) } catch { return '[unserialisable error]' }
+  }
+  return String(cause)
+}
+
 export class DbError extends Error {
   action: string
   cause: unknown
   constructor(action: string, cause: unknown) {
-    super(`${action}: ${cause instanceof Error ? cause.message : String(cause)}`)
+    super(`${action}: ${formatCause(cause)}`)
     this.name = 'DbError'
     this.action = action
     this.cause = cause
+    // Surface the underlying error to the console for production debugging
+    console.error(`[DbError] ${action}`, cause)
   }
 }
 
