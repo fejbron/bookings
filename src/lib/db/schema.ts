@@ -10,8 +10,32 @@ export interface LecturerProfileRow {
   title: string | null
   description: string | null
   class_group: string | null
-  account_type: 'lecturer' | 'professional'
   is_public: boolean
+  institution: string | null
+  department: string | null
+  office_location: string | null
+  office_hours: string | null
+  courses: string[] | null
+  academic_rank: string | null
+  created_at: string
+}
+
+export interface ProfessionalProfileRow {
+  id: string
+  user_id: string | null
+  username: string | null
+  email: string
+  name: string
+  title: string | null
+  description: string | null
+  is_public: boolean
+  company: string | null
+  industry: string | null
+  job_title: string | null
+  services: string | null
+  location: string | null
+  website: string | null
+  linkedin_url: string | null
   created_at: string
 }
 

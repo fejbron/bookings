@@ -10,7 +10,7 @@ import { createBooking } from '../lib/db/mutations'
 import Calendar from '../components/Calendar'
 import TimeSlots, { formatTime } from '../components/TimeSlots'
 import { LoadingState } from '../components/ui/States'
-import type { LecturerProfile, PresentationSlot, CalendarTypeRecord, BookingStudent } from '../types'
+import type { Profile, PresentationSlot, CalendarTypeRecord, BookingStudent } from '../types'
 
 const COLOR_BG: Record<string, string> = {
   blue: '#006BFF', purple: '#7C3AED', green: '#059669',
@@ -20,7 +20,7 @@ const COLOR_BG: Record<string, string> = {
 type View = 'type' | 'select' | 'confirm'
 
 interface PageData {
-  profile: LecturerProfile
+  profile: Profile
   slots: PresentationSlot[]
   calendarTypes: CalendarTypeRecord[]
   takenSlotIds: Set<string>

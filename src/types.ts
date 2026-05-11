@@ -1,18 +1,40 @@
 export type AccountType = 'lecturer' | 'professional'
 
-export interface LecturerProfile {
+interface BaseProfile {
   id: string
   userId?: string
   username?: string
   name: string
   email: string
   title?: string
-  classGroup?: string
   description?: string
-  accountType: AccountType
   isPublic: boolean
   createdAt: string
 }
+
+export interface LecturerProfile extends BaseProfile {
+  accountType: 'lecturer'
+  classGroup?: string
+  institution?: string
+  department?: string
+  officeLocation?: string
+  officeHours?: string
+  courses: string[]
+  academicRank?: string
+}
+
+export interface ProfessionalProfile extends BaseProfile {
+  accountType: 'professional'
+  company?: string
+  industry?: string
+  jobTitle?: string
+  services?: string
+  location?: string
+  website?: string
+  linkedinUrl?: string
+}
+
+export type Profile = LecturerProfile | ProfessionalProfile
 
 export interface BookingStudent {
   name: string
@@ -70,7 +92,7 @@ export interface TeamMember {
 
 export interface ManagedAccount {
   hostUserId: string
-  profile: LecturerProfile
+  profile: Profile
   role: string
 }
 

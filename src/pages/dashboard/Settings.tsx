@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Check, AlertCircle, Eye, EyeOff, Globe, Mail, Shield, User, Users, Trash2, UserPlus, GraduationCap, BriefcaseBusiness } from 'lucide-react'
-import type { AccountType } from '../../types'
 import { useAuth, useAccount, useSettings } from '../../hooks'
 import { saveEmailConfig, clearEmailConfig, getEmailConfig, isEmailConfigured, sendBookingConfirmationEmail } from '../../lib/email'
 
@@ -24,13 +23,29 @@ export default function DashboardSettings() {
 
   const [activeTab, setActiveTab] = useState<Tab>('profile')
 
-  // Profile tab
-  const [accountType, setAccountType] = useState<AccountType>(profile?.accountType ?? 'professional')
+  // Profile tab — common fields
+  const accountType = profile?.accountType ?? 'professional'
   const [name, setName] = useState(profile?.name ?? '')
   const [username, setUsername] = useState(profile?.username ?? '')
   const [title, setTitle] = useState(profile?.title ?? '')
   const [bio, setBio] = useState(profile?.description ?? '')
   const [isPublic, setIsPublic] = useState(profile?.isPublic ?? true)
+  // Lecturer-only
+  const [institution, setInstitution]       = useState(profile?.accountType === 'lecturer' ? profile.institution ?? '' : '')
+  const [department, setDepartment]         = useState(profile?.accountType === 'lecturer' ? profile.department ?? '' : '')
+  const [officeLocation, setOfficeLocation] = useState(profile?.accountType === 'lecturer' ? profile.officeLocation ?? '' : '')
+  const [officeHours, setOfficeHours]       = useState(profile?.accountType === 'lecturer' ? profile.officeHours ?? '' : '')
+  const [coursesText, setCoursesText]       = useState(profile?.accountType === 'lecturer' ? (profile.courses ?? []).join(', ') : '')
+  const [academicRank, setAcademicRank]     = useState(profile?.accountType === 'lecturer' ? profile.academicRank ?? '' : '')
+  // Professional-only
+  const [company, setCompany]       = useState(profile?.accountType === 'professional' ? profile.company ?? '' : '')
+  const [industry, setIndustry]     = useState(profile?.accountType === 'professional' ? profile.industry ?? '' : '')
+  const [jobTitle, setJobTitle]     = useState(profile?.accountType === 'professional' ? profile.jobTitle ?? '' : '')
+  const [services, setServices]     = useState(profile?.accountType === 'professional' ? profile.services ?? '' : '')
+  const [location, setLocation]     = useState(profile?.accountType === 'professional' ? profile.location ?? '' : '')
+  const [website, setWebsite]       = useState(profile?.accountType === 'professional' ? profile.website ?? '' : '')
+  const [linkedinUrl, setLinkedinUrl] = useState(profile?.accountType === 'professional' ? profile.linkedinUrl ?? '' : '')
+
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -71,7 +86,14 @@ export default function DashboardSettings() {
     setProfileSaving(true)
     setProfileMsg(null)
     try {
-      await updateProfile({ name, username, title, description: bio, accountType, isPublic })
+      const common = { name, username, title, description: bio, isPublic }
+      const extras = accountType === 'lecturer'
+        ? {
+            institution, department, officeLocation, officeHours, academicRank,
+            courses: coursesText.split(',').map((s) => s.trim()).filter(Boolean),
+          }
+        : { company, industry, jobTitle, services, location, website, linkedinUrl }
+      await updateProfile({ ...common, ...extras })
       setProfileMsg({ type: 'success', text: 'Profile saved.' })
       setTimeout(() => setProfileMsg(null), 3000)
     } catch (e) {
@@ -198,26 +220,12 @@ export default function DashboardSettings() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-2">Account type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { key: 'professional' as AccountType, label: 'Professional', icon: BriefcaseBusiness },
-                      { key: 'lecturer' as AccountType,     label: 'Lecturer',     icon: GraduationCap },
-                    ]).map(({ key, label, icon: Icon }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setAccountType(key)}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                          accountType === key
-                            ? 'border-gray-900 bg-gray-50 text-gray-900'
-                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                        }`}
-                      >
-                        <Icon style={{ width: 14, height: 14 }} />
-                        {label}
-                      </button>
-                    ))}
+                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-medium text-gray-900">
+                    {accountType === 'lecturer'
+                      ? <><GraduationCap style={{ width: 14, height: 14 }} /> Lecturer</>
+                      : <><BriefcaseBusiness style={{ width: 14, height: 14 }} /> Professional</>}
                   </div>
+                  <p className="mt-1.5 text-[11px] text-gray-400">Set during signup and can't be changed here.</p>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -243,6 +251,77 @@ export default function DashboardSettings() {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Bio</label>
                   <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} maxLength={400} placeholder="A short bio shown on your booking page…" className={`${inputCls} resize-none`} />
                 </div>
+
+                {accountType === 'lecturer' && (
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Academic details</h3>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Institution</label>
+                        <input type="text" value={institution} onChange={e => setInstitution(e.target.value)} maxLength={120} placeholder="e.g. KNUST" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Department</label>
+                        <input type="text" value={department} onChange={e => setDepartment(e.target.value)} maxLength={120} placeholder="Computer Science" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Academic rank</label>
+                        <input type="text" value={academicRank} onChange={e => setAcademicRank(e.target.value)} maxLength={80} placeholder="Senior Lecturer" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Office location</label>
+                        <input type="text" value={officeLocation} onChange={e => setOfficeLocation(e.target.value)} maxLength={120} placeholder="PB 304" className={inputCls} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Office hours</label>
+                      <input type="text" value={officeHours} onChange={e => setOfficeHours(e.target.value)} maxLength={120} placeholder="Tue & Thu 2–4pm" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Courses</label>
+                      <input type="text" value={coursesText} onChange={e => setCoursesText(e.target.value)} maxLength={300} placeholder="CSM 165, CSM 261" className={inputCls} />
+                      <p className="mt-1 text-[11px] text-gray-400">Separate course codes with commas.</p>
+                    </div>
+                  </div>
+                )}
+
+                {accountType === 'professional' && (
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Professional details</h3>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Company</label>
+                        <input type="text" value={company} onChange={e => setCompany(e.target.value)} maxLength={120} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Job title</label>
+                        <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} maxLength={120} placeholder="Senior Designer" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Industry</label>
+                        <input type="text" value={industry} onChange={e => setIndustry(e.target.value)} maxLength={120} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Location</label>
+                        <input type="text" value={location} onChange={e => setLocation(e.target.value)} maxLength={120} placeholder="Accra, Ghana" className={inputCls} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Services offered</label>
+                      <textarea value={services} onChange={e => setServices(e.target.value)} rows={2} maxLength={400} placeholder="What do you offer clients?" className={`${inputCls} resize-none`} />
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Website</label>
+                        <input type="url" value={website} onChange={e => setWebsite(e.target.value)} maxLength={200} placeholder="https://…" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">LinkedIn</label>
+                        <input type="url" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} maxLength={200} placeholder="https://linkedin.com/in/…" className={inputCls} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between py-2 border-t border-gray-100">
                   <div>

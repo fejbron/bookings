@@ -2,10 +2,12 @@
 
 import { eachDayOfInterval, parseISO, format } from 'date-fns'
 import { supabase } from '../supabase'
-import { toProfile, toCalendarType, toSlot, toBooking, toTeamMember } from './mappers'
-import { DbError } from './queries'
+import {
+  toLecturerProfile, toProfessionalProfile, toCalendarType, toSlot, toBooking, toTeamMember,
+} from './mappers'
+import { DbError, getProfileByUserId } from './queries'
 import type {
-  LecturerProfile, CalendarTypeRecord, PresentationSlot,
+  Profile, CalendarTypeRecord, PresentationSlot,
   Booking, BookingStudent, TeamMember, AccountType,
 } from '../../types'
 
@@ -21,9 +23,14 @@ export interface CreateProfileInput {
   description?: string
 }
 
-export async function upsertProfile(input: CreateProfileInput): Promise<LecturerProfile> {
+function profileTable(accountType: AccountType): 'lecturer_profiles' | 'professional_profiles' {
+  return accountType === 'lecturer' ? 'lecturer_profiles' : 'professional_profiles'
+}
+
+export async function upsertProfile(input: CreateProfileInput): Promise<Profile> {
+  const table = profileTable(input.accountType)
   const { data, error } = await supabase
-    .from('lecturer_profiles')
+    .from(table)
     .upsert({
       user_id: input.userId,
       email: input.email,
@@ -31,13 +38,14 @@ export async function upsertProfile(input: CreateProfileInput): Promise<Lecturer
       username: input.username.trim().toLowerCase(),
       title: input.title?.trim() || null,
       description: input.description?.trim() || null,
-      account_type: input.accountType,
       is_public: true,
     }, { onConflict: 'user_id' })
     .select('*').single()
   if (error) throw new DbError('upsertProfile', error)
-  return toProfile(data)
+  return input.accountType === 'lecturer' ? toLecturerProfile(data) : toProfessionalProfile(data)
 }
+
+// Common-field updates ────────────────────────────────────────────────────────
 
 export interface UpdateProfileInput {
   userId: string
@@ -45,25 +53,87 @@ export interface UpdateProfileInput {
   username?: string
   title?: string
   description?: string
-  classGroup?: string
-  accountType?: AccountType
   isPublic?: boolean
+  // Lecturer-only
+  classGroup?: string
+  institution?: string
+  department?: string
+  officeLocation?: string
+  officeHours?: string
+  courses?: string[]
+  academicRank?: string
+  // Professional-only
+  company?: string
+  industry?: string
+  jobTitle?: string
+  services?: string
+  location?: string
+  website?: string
+  linkedinUrl?: string
 }
 
-export async function updateProfile(input: UpdateProfileInput): Promise<LecturerProfile> {
-  const patch: Record<string, unknown> = {}
-  if (input.name !== undefined)        patch.name = input.name.trim()
-  if (input.username !== undefined)    patch.username = input.username.trim().toLowerCase()
-  if (input.title !== undefined)       patch.title = input.title.trim() || null
-  if (input.description !== undefined) patch.description = input.description.trim() || null
-  if (input.classGroup !== undefined)  patch.class_group = input.classGroup.trim() || null
-  if (input.accountType !== undefined) patch.account_type = input.accountType
-  if (input.isPublic !== undefined)    patch.is_public = input.isPublic
+const COMMON_PATCH: Record<string, (v: unknown) => unknown> = {
+  name:        (v) => typeof v === 'string' ? v.trim() : v,
+  username:    (v) => typeof v === 'string' ? v.trim().toLowerCase() : v,
+  title:       (v) => typeof v === 'string' ? (v.trim() || null) : v,
+  description: (v) => typeof v === 'string' ? (v.trim() || null) : v,
+  isPublic:    (v) => v,
+}
 
+const COMMON_COL: Record<string, string> = {
+  name: 'name', username: 'username', title: 'title',
+  description: 'description', isPublic: 'is_public',
+}
+
+const LECTURER_COL: Record<string, string> = {
+  classGroup: 'class_group', institution: 'institution', department: 'department',
+  officeLocation: 'office_location', officeHours: 'office_hours',
+  courses: 'courses', academicRank: 'academic_rank',
+}
+
+const PROFESSIONAL_COL: Record<string, string> = {
+  company: 'company', industry: 'industry', jobTitle: 'job_title',
+  services: 'services', location: 'location', website: 'website',
+  linkedinUrl: 'linkedin_url',
+}
+
+function buildPatch(input: UpdateProfileInput, typeCol: Record<string, string>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {}
+  for (const [key, col] of Object.entries(COMMON_COL)) {
+    const value = (input as Record<string, unknown>)[key]
+    if (value !== undefined) {
+      const norm = COMMON_PATCH[key] ?? ((v: unknown) => v)
+      patch[col] = norm(value)
+    }
+  }
+  for (const [key, col] of Object.entries(typeCol)) {
+    const value = (input as Record<string, unknown>)[key]
+    if (value !== undefined) {
+      if (typeof value === 'string') patch[col] = value.trim() || null
+      else patch[col] = value
+    }
+  }
+  return patch
+}
+
+export async function updateProfile(input: UpdateProfileInput): Promise<Profile> {
+  // Find which table this user lives in.
+  const current = await getProfileByUserId(input.userId)
+  if (!current) throw new DbError('updateProfile', { message: 'No profile exists for this user.' })
+
+  if (current.accountType === 'lecturer') {
+    const patch = buildPatch(input, LECTURER_COL)
+    const { data, error } = await supabase
+      .from('lecturer_profiles').update(patch).eq('user_id', input.userId).select('*').single()
+    if (error) throw new DbError('updateProfile', error)
+    return toLecturerProfile(data)
+  }
+
+  const patch = buildPatch(input, PROFESSIONAL_COL)
   const { data, error } = await supabase
-    .from('lecturer_profiles').update(patch).eq('user_id', input.userId).select('*').single()
+    .from('professional_profiles').update(patch).eq('user_id', input.userId).select('*').single()
   if (error) throw new DbError('updateProfile', error)
-  return toProfile(data)
+  return toProfessionalProfile(data)
 }
 
 // Calendar types ──────────────────────────────────────────────────────────────

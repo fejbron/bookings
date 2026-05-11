@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, Clock, Search, LogIn, GraduationCap } from 'lucide-react'
 import { getDirectoryListing } from '../lib/db/queries'
 import { ErrorState } from '../components/ui/States'
-import type { LecturerProfile } from '../types'
+import type { Profile } from '../types'
 
 function Avatar({ name, size = 12 }: { name: string; size?: number }) {
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -16,9 +16,7 @@ function Avatar({ name, size = 12 }: { name: string; size?: number }) {
   )
 }
 
-interface PublicProfile extends LecturerProfile {
-  slotCount?: number
-}
+type PublicProfile = Profile & { slotCount?: number }
 
 export default function Home() {
   const [profiles, setProfiles] = useState<PublicProfile[]>([])

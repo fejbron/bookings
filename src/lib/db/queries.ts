@@ -3,11 +3,11 @@
 
 import { supabase } from '../supabase'
 import {
-  toProfile, toCalendarType, toSlot, toSlotConfig,
+  toLecturerProfile, toProfessionalProfile, toCalendarType, toSlot, toSlotConfig,
   toBooking, toSettings, toTeamMember,
 } from './mappers'
 import type {
-  LecturerProfile, CalendarTypeRecord, PresentationSlot, SlotConfig,
+  Profile, CalendarTypeRecord, PresentationSlot, SlotConfig,
   Booking, TeamMember, ManagedAccount,
 } from '../../types'
 
@@ -42,29 +42,47 @@ export class DbError extends Error {
 
 // Profiles ─────────────────────────────────────────────────────────────────────
 
-export async function getProfileByUserId(userId: string): Promise<LecturerProfile | null> {
-  const { data, error } = await supabase
-    .from('lecturer_profiles').select('*').eq('user_id', userId).maybeSingle()
-  if (error) throw new DbError('getProfileByUserId', error)
-  return data ? toProfile(data) : null
+export async function getProfileByUserId(userId: string): Promise<Profile | null> {
+  const [lecRes, proRes] = await Promise.all([
+    supabase.from('lecturer_profiles').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('professional_profiles').select('*').eq('user_id', userId).maybeSingle(),
+  ])
+  if (lecRes.error) throw new DbError('getProfileByUserId.lecturer', lecRes.error)
+  if (proRes.error) throw new DbError('getProfileByUserId.professional', proRes.error)
+  if (lecRes.data) return toLecturerProfile(lecRes.data)
+  if (proRes.data) return toProfessionalProfile(proRes.data)
+  return null
 }
 
-export async function getProfileByUsername(username: string): Promise<LecturerProfile | null> {
-  const { data, error } = await supabase
-    .from('lecturer_profiles').select('*').eq('username', username).eq('is_public', true).maybeSingle()
-  if (error) throw new DbError('getProfileByUsername', error)
-  return data ? toProfile(data) : null
+export async function getProfileByUsername(username: string): Promise<Profile | null> {
+  const [lecRes, proRes] = await Promise.all([
+    supabase.from('lecturer_profiles').select('*').eq('username', username).eq('is_public', true).maybeSingle(),
+    supabase.from('professional_profiles').select('*').eq('username', username).eq('is_public', true).maybeSingle(),
+  ])
+  if (lecRes.error) throw new DbError('getProfileByUsername.lecturer', lecRes.error)
+  if (proRes.error) throw new DbError('getProfileByUsername.professional', proRes.error)
+  if (lecRes.data) return toLecturerProfile(lecRes.data)
+  if (proRes.data) return toProfessionalProfile(proRes.data)
+  return null
 }
 
-export async function getPublicProfiles(): Promise<LecturerProfile[]> {
-  const { data, error } = await supabase
-    .from('lecturer_profiles').select('*')
-    .eq('is_public', true).not('username', 'is', null).order('name')
-  if (error) throw new DbError('getPublicProfiles', error)
-  return (data ?? []).map(toProfile)
+export async function getPublicProfiles(): Promise<Profile[]> {
+  const [lecRes, proRes] = await Promise.all([
+    supabase.from('lecturer_profiles').select('*')
+      .eq('is_public', true).not('username', 'is', null).order('name'),
+    supabase.from('professional_profiles').select('*')
+      .eq('is_public', true).not('username', 'is', null).order('name'),
+  ])
+  if (lecRes.error) throw new DbError('getPublicProfiles.lecturer', lecRes.error)
+  if (proRes.error) throw new DbError('getPublicProfiles.professional', proRes.error)
+  const profiles: Profile[] = [
+    ...(lecRes.data ?? []).map(toLecturerProfile),
+    ...(proRes.data ?? []).map(toProfessionalProfile),
+  ]
+  return profiles.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export async function getDirectoryListing(today: string): Promise<{ profile: LecturerProfile; slotCount: number }[]> {
+export async function getDirectoryListing(today: string): Promise<{ profile: Profile; slotCount: number }[]> {
   const profiles = await getPublicProfiles()
   const userIds = profiles.map((p) => p.userId).filter((x): x is string => !!x)
   if (userIds.length === 0) return profiles.map((profile) => ({ profile, slotCount: 0 }))
@@ -82,10 +100,13 @@ export async function getDirectoryListing(today: string): Promise<{ profile: Lec
 }
 
 export async function isUsernameTaken(username: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('lecturer_profiles').select('id').eq('username', username).maybeSingle()
-  if (error) throw new DbError('isUsernameTaken', error)
-  return !!data
+  const [lecRes, proRes] = await Promise.all([
+    supabase.from('lecturer_profiles').select('id').eq('username', username).maybeSingle(),
+    supabase.from('professional_profiles').select('id').eq('username', username).maybeSingle(),
+  ])
+  if (lecRes.error) throw new DbError('isUsernameTaken.lecturer', lecRes.error)
+  if (proRes.error) throw new DbError('isUsernameTaken.professional', proRes.error)
+  return !!lecRes.data || !!proRes.data
 }
 
 // Account data (slots, configs, calendar types, settings) ─────────────────────
@@ -132,7 +153,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 // Public booking page payload ─────────────────────────────────────────────────
 
 export interface PublicPageData {
-  profile: LecturerProfile
+  profile: Profile
   slots: PresentationSlot[]
   calendarTypes: CalendarTypeRecord[]
   takenSlotIds: Set<string>
@@ -212,14 +233,20 @@ export async function getManagedAccounts(userEmail: string, userId: string): Pro
   }
 
   const hostIds = memberships.map((m) => m.host_user_id)
-  const { data: profiles, error: profilesErr } = await supabase
-    .from('lecturer_profiles').select('*').in('user_id', hostIds)
-  if (profilesErr) throw new DbError('getManagedAccounts.profiles', profilesErr)
+  const [lecRes, proRes] = await Promise.all([
+    supabase.from('lecturer_profiles').select('*').in('user_id', hostIds),
+    supabase.from('professional_profiles').select('*').in('user_id', hostIds),
+  ])
+  if (lecRes.error) throw new DbError('getManagedAccounts.lecturers', lecRes.error)
+  if (proRes.error) throw new DbError('getManagedAccounts.professionals', proRes.error)
+
+  const lecturerByUid = new Map((lecRes.data ?? []).map((p) => [p.user_id as string, toLecturerProfile(p)]))
+  const professionalByUid = new Map((proRes.data ?? []).map((p) => [p.user_id as string, toProfessionalProfile(p)]))
 
   return memberships
     .map((m) => {
-      const p = profiles?.find((pr) => pr.user_id === m.host_user_id)
-      return p ? { hostUserId: m.host_user_id, profile: toProfile(p), role: m.role } : null
+      const p = lecturerByUid.get(m.host_user_id) ?? professionalByUid.get(m.host_user_id)
+      return p ? { hostUserId: m.host_user_id, profile: p, role: m.role } : null
     })
     .filter((x): x is ManagedAccount => x !== null)
 }

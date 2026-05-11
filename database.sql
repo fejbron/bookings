@@ -13,7 +13,31 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- gen_random_uuid()
 
 -- Tables ───────────────────────────────────────────────────────────────────────
 
+-- Lecturers (academic accounts). Was previously a unified `lecturer_profiles`
+-- table with an `account_type` discriminator; professional accounts now live
+-- in `professional_profiles` (below).
 CREATE TABLE IF NOT EXISTS lecturer_profiles (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  username        text,
+  email           text NOT NULL,
+  name            text NOT NULL,
+  title           text,
+  description     text,
+  class_group     text,
+  is_public       boolean NOT NULL DEFAULT true,
+  -- lecturer-specific
+  institution     text,
+  department      text,
+  office_location text,
+  office_hours    text,
+  courses         text[] NOT NULL DEFAULT '{}',
+  academic_rank   text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- Professionals (non-academic: consultants, designers, advisors, etc.)
+CREATE TABLE IF NOT EXISTS professional_profiles (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   username     text,
@@ -21,9 +45,15 @@ CREATE TABLE IF NOT EXISTS lecturer_profiles (
   name         text NOT NULL,
   title        text,
   description  text,
-  class_group  text,
-  account_type text NOT NULL DEFAULT 'professional',  -- 'lecturer' | 'professional'
   is_public    boolean NOT NULL DEFAULT true,
+  -- professional-specific
+  company      text,
+  industry     text,
+  job_title    text,
+  services     text,
+  location     text,
+  website      text,
+  linkedin_url text,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
@@ -102,13 +132,41 @@ CREATE TABLE IF NOT EXISTS team_members (
 
 -- Backfill columns that may be missing on legacy installations ─────────────────
 
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS username     text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS title        text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS description  text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS class_group  text;
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS account_type text NOT NULL DEFAULT 'professional';
-ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS is_public    boolean NOT NULL DEFAULT true;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS username        text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS title           text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS description     text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS class_group     text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS is_public       boolean NOT NULL DEFAULT true;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS institution     text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS department      text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS office_location text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS office_hours    text;
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS courses         text[] NOT NULL DEFAULT '{}';
+ALTER TABLE lecturer_profiles ADD COLUMN IF NOT EXISTS academic_rank   text;
+
+-- One-time migration: move professional accounts out of lecturer_profiles
+-- into their own table, then drop the now-redundant account_type column.
+-- Guarded on column existence so re-runs are safe no-ops.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lecturer_profiles'
+      AND column_name = 'account_type'
+  ) THEN
+    INSERT INTO professional_profiles
+      (id, user_id, username, email, name, title, description, is_public, created_at)
+    SELECT id, user_id, username, email, name, title, description, is_public, created_at
+    FROM lecturer_profiles
+    WHERE account_type = 'professional'
+    ON CONFLICT (id) DO NOTHING;
+
+    DELETE FROM lecturer_profiles WHERE account_type = 'professional';
+    ALTER TABLE lecturer_profiles DROP COLUMN account_type;
+  END IF;
+END $$;
 
 ALTER TABLE calendar_types ADD COLUMN IF NOT EXISTS user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 ALTER TABLE calendar_types ADD COLUMN IF NOT EXISTS is_presentation boolean NOT NULL DEFAULT false;
@@ -123,18 +181,21 @@ ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS user_id      uuid REFERENCES
 ALTER TABLE calendar_types DROP CONSTRAINT IF EXISTS calendar_types_name_key;
 
 -- Ensure id columns have a default on legacy tables (older migrations omitted it)
-ALTER TABLE lecturer_profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE calendar_types    ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE slots             ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE slot_configs      ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE bookings          ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE admin_settings    ALTER COLUMN id SET DEFAULT gen_random_uuid();
-ALTER TABLE team_members      ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE lecturer_profiles     ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE professional_profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE calendar_types        ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE slots                 ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE slot_configs          ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE bookings              ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE admin_settings        ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE team_members          ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 -- Indices ──────────────────────────────────────────────────────────────────────
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_username   ON lecturer_profiles(username) WHERE username IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_user_id    ON lecturer_profiles(user_id)  WHERE user_id  IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_username   ON lecturer_profiles(username)     WHERE username IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_user_id    ON lecturer_profiles(user_id)      WHERE user_id  IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_username   ON professional_profiles(username) WHERE username IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_user_id    ON professional_profiles(user_id)  WHERE user_id  IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ct_name_user  ON calendar_types(name, user_id) WHERE user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_as_user_id    ON admin_settings(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX        IF NOT EXISTS idx_slots_user_date    ON slots(user_id, date);
@@ -143,6 +204,44 @@ CREATE INDEX        IF NOT EXISTS idx_bookings_host      ON bookings(host_user_i
 CREATE INDEX        IF NOT EXISTS idx_bookings_email     ON bookings(student_email);
 CREATE INDEX        IF NOT EXISTS idx_tm_member_email    ON team_members(member_email);
 CREATE INDEX        IF NOT EXISTS idx_tm_host_user       ON team_members(host_user_id);
+
+-- Cross-table username uniqueness ──────────────────────────────────────────────
+-- Each table has its own unique index on username, but a lecturer and a
+-- professional can't share the same handle either. These triggers reject any
+-- insert/update whose username already exists in the other table.
+
+CREATE OR REPLACE FUNCTION check_lecturer_username_unique()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.username IS NULL THEN RETURN NEW; END IF;
+  IF EXISTS (SELECT 1 FROM professional_profiles WHERE username = NEW.username) THEN
+    RAISE EXCEPTION 'Username % is already taken', NEW.username
+      USING ERRCODE = 'unique_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION check_professional_username_unique()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.username IS NULL THEN RETURN NEW; END IF;
+  IF EXISTS (SELECT 1 FROM lecturer_profiles WHERE username = NEW.username) THEN
+    RAISE EXCEPTION 'Username % is already taken', NEW.username
+      USING ERRCODE = 'unique_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_lp_username_unique ON lecturer_profiles;
+DROP TRIGGER IF EXISTS trg_pp_username_unique ON professional_profiles;
+CREATE TRIGGER trg_lp_username_unique
+  BEFORE INSERT OR UPDATE OF username ON lecturer_profiles
+  FOR EACH ROW EXECUTE FUNCTION check_lecturer_username_unique();
+CREATE TRIGGER trg_pp_username_unique
+  BEFORE INSERT OR UPDATE OF username ON professional_profiles
+  FOR EACH ROW EXECUTE FUNCTION check_professional_username_unique();
 
 -- RLS ──────────────────────────────────────────────────────────────────────────
 
@@ -164,6 +263,24 @@ CREATE POLICY "lp_insert" ON lecturer_profiles FOR INSERT WITH CHECK (auth.uid()
 -- Allow claiming orphan profiles (user_id IS NULL = legacy data)
 CREATE POLICY "lp_update" ON lecturer_profiles FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL);
 CREATE POLICY "lp_delete" ON lecturer_profiles FOR DELETE USING (auth.uid() = user_id);
+
+-- professional_profiles (mirror of lecturer_profiles)
+ALTER TABLE professional_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pp_read"   ON professional_profiles;
+DROP POLICY IF EXISTS "pp_insert" ON professional_profiles;
+DROP POLICY IF EXISTS "pp_update" ON professional_profiles;
+DROP POLICY IF EXISTS "pp_delete" ON professional_profiles;
+CREATE POLICY "pp_read" ON professional_profiles FOR SELECT USING (
+  is_public
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members
+    WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "pp_insert" ON professional_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "pp_update" ON professional_profiles FOR UPDATE USING (auth.uid() = user_id OR user_id IS NULL);
+CREATE POLICY "pp_delete" ON professional_profiles FOR DELETE USING (auth.uid() = user_id);
 
 -- slots: public read for the booking pages; owner manages
 ALTER TABLE slots ENABLE ROW LEVEL SECURITY;
@@ -308,9 +425,11 @@ DECLARE
   target_user_id uuid;
   s int := 0; c int := 0; t int := 0; a int := 0; b int := 0;
 BEGIN
-  SELECT user_id INTO target_user_id
-  FROM lecturer_profiles
-  WHERE user_id IS NOT NULL
+  SELECT user_id INTO target_user_id FROM (
+    SELECT user_id, created_at FROM lecturer_profiles     WHERE user_id IS NOT NULL
+    UNION ALL
+    SELECT user_id, created_at FROM professional_profiles WHERE user_id IS NOT NULL
+  ) p
   ORDER BY created_at LIMIT 1;
 
   IF target_user_id IS NULL THEN

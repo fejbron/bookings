@@ -2,15 +2,15 @@
 // Every read goes through these. No row→domain logic anywhere else.
 
 import type {
-  LecturerProfile, CalendarTypeRecord, PresentationSlot, SlotConfig,
-  Booking, BookingStudent, TeamMember,
+  LecturerProfile, ProfessionalProfile, CalendarTypeRecord, PresentationSlot,
+  SlotConfig, Booking, BookingStudent, TeamMember,
 } from '../../types'
 import type {
-  LecturerProfileRow, CalendarTypeRow, SlotRow, SlotConfigRow,
-  BookingRow, AdminSettingsRow, TeamMemberRow,
+  LecturerProfileRow, ProfessionalProfileRow, CalendarTypeRow, SlotRow,
+  SlotConfigRow, BookingRow, AdminSettingsRow, TeamMemberRow,
 } from './schema'
 
-export function toProfile(r: LecturerProfileRow): LecturerProfile {
+export function toLecturerProfile(r: LecturerProfileRow): LecturerProfile {
   return {
     id: r.id,
     userId: r.user_id ?? undefined,
@@ -20,8 +20,36 @@ export function toProfile(r: LecturerProfileRow): LecturerProfile {
     title: r.title ?? undefined,
     description: r.description ?? undefined,
     classGroup: r.class_group ?? undefined,
-    accountType: r.account_type ?? 'professional',
+    accountType: 'lecturer',
     isPublic: r.is_public,
+    institution: r.institution ?? undefined,
+    department: r.department ?? undefined,
+    officeLocation: r.office_location ?? undefined,
+    officeHours: r.office_hours ?? undefined,
+    courses: r.courses ?? [],
+    academicRank: r.academic_rank ?? undefined,
+    createdAt: r.created_at,
+  }
+}
+
+export function toProfessionalProfile(r: ProfessionalProfileRow): ProfessionalProfile {
+  return {
+    id: r.id,
+    userId: r.user_id ?? undefined,
+    username: r.username ?? undefined,
+    email: r.email,
+    name: r.name,
+    title: r.title ?? undefined,
+    description: r.description ?? undefined,
+    accountType: 'professional',
+    isPublic: r.is_public,
+    company: r.company ?? undefined,
+    industry: r.industry ?? undefined,
+    jobTitle: r.job_title ?? undefined,
+    services: r.services ?? undefined,
+    location: r.location ?? undefined,
+    website: r.website ?? undefined,
+    linkedinUrl: r.linkedin_url ?? undefined,
     createdAt: r.created_at,
   }
 }

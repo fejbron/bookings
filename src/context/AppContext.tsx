@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase'
 import * as q from '../lib/db/queries'
 import * as m from '../lib/db/mutations'
 import type {
-  LecturerProfile, CalendarTypeRecord, PresentationSlot, SlotConfig,
+  Profile, CalendarTypeRecord, PresentationSlot, SlotConfig,
   Booking, BookingStudent, TeamMember, ManagedAccount,
 } from '../types'
 
@@ -31,12 +31,12 @@ interface AppContextValue {
   // Auth
   user: User | null
   authLoading: boolean
-  profile: LecturerProfile | null
+  profile: Profile | null
   needsSetup: boolean
 
   // Active account (own or managed)
   activeUserId: string | null
-  activeProfile: LecturerProfile | null
+  activeProfile: Profile | null
   isManagingOther: boolean
   managedAccounts: ManagedAccount[]
   teamMembers: TeamMember[]
@@ -52,7 +52,7 @@ interface AppContextValue {
   signOut: () => Promise<void>
   changePassword: (current: string, next: string) => Promise<string | null>
   createProfile: (input: { name: string; username: string; accountType: 'lecturer' | 'professional'; title?: string; description?: string }) => Promise<void>
-  updateProfile: (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'accountType' | 'isPublic'>>) => Promise<void>
+  updateProfile: (input: UpdateProfilePatch) => Promise<void>
 
   // Account switching
   switchAccount: (userId: string) => void
@@ -87,13 +87,25 @@ interface AppContextValue {
   getAvailableSlots: (date: string, calendarType?: string) => PresentationSlot[]
 }
 
+// All fields the UI can patch on a profile. The mutation layer picks which
+// columns go into which table based on the row's actual type.
+type UpdateProfilePatch = Partial<{
+  name: string; username: string; title: string; description: string; isPublic: boolean
+  // Lecturer
+  classGroup: string; institution: string; department: string
+  officeLocation: string; officeHours: string; courses: string[]; academicRank: string
+  // Professional
+  company: string; industry: string; jobTitle: string; services: string
+  location: string; website: string; linkedinUrl: string
+}>
+
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   // Auth state
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const [profile, setProfile] = useState<LecturerProfile | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [activeUserId, setActiveUserId] = useState<string | null>(null)
@@ -212,7 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveUserId(user.id)
   }, [user])
 
-  const updateProfile = useCallback(async (input: Partial<Pick<LecturerProfile, 'name' | 'username' | 'title' | 'description' | 'classGroup' | 'accountType' | 'isPublic'>>) => {
+  const updateProfile = useCallback(async (input: UpdateProfilePatch) => {
     if (!user) throw new Error('Not authenticated')
     if (input.username && input.username !== profile?.username) {
       const taken = await q.isUsernameTaken(input.username.trim().toLowerCase())
