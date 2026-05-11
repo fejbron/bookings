@@ -159,7 +159,12 @@ DROP POLICY IF EXISTS "slots_insert" ON slots;
 DROP POLICY IF EXISTS "slots_update" ON slots;
 DROP POLICY IF EXISTS "slots_delete" ON slots;
 CREATE POLICY "slots_read"   ON slots FOR SELECT USING (true);
-CREATE POLICY "slots_insert" ON slots FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "slots_insert" ON slots FOR INSERT WITH CHECK (
+  auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
 CREATE POLICY "slots_update" ON slots FOR UPDATE USING (
   auth.uid() = user_id
   OR user_id IN (

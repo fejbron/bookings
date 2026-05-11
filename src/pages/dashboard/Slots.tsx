@@ -26,6 +26,8 @@ export default function DashboardSlots() {
   const [excludeWeekends, setExcludeWeekends] = useState(true)
   const [classGroup, setClassGroup] = useState('')
   const [generated, setGenerated] = useState<number | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [filterCalendarType, setFilterCalendarType] = useState('')
@@ -102,9 +104,22 @@ export default function DashboardSlots() {
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const result = await generateSlots({ startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends, calendarType: effectiveCalendarType, classGroup: classGroup.trim() || undefined })
-    setGenerated(result.length)
-    setTimeout(() => setGenerated(null), 4000)
+    setGenerateError(null)
+    setGenerated(null)
+    setGenerating(true)
+    try {
+      const result = await generateSlots({ startDate, endDate, startTime, endTime, duration, breakBetween, excludeWeekends, calendarType: effectiveCalendarType, classGroup: classGroup.trim() || undefined })
+      if (result.length === 0) {
+        setGenerateError('No new slots created — they already exist for these dates and times.')
+      } else {
+        setGenerated(result.length)
+        setTimeout(() => setGenerated(null), 4000)
+      }
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate slots.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   async function handleAddType() {
@@ -256,11 +271,12 @@ export default function DashboardSlots() {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <button type="submit" disabled={!canGenerate || !effectiveCalendarType} className="flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              <Plus className="w-4 h-4" /> Generate Slots
+          <div className="flex items-center gap-3 flex-wrap">
+            <button type="submit" disabled={!canGenerate || !effectiveCalendarType || generating} className="flex items-center gap-2 bg-[var(--accent)] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              <Plus className="w-4 h-4" /> {generating ? 'Generating…' : 'Generate Slots'}
             </button>
             {generated !== null && <span className="text-sm text-emerald-600 font-medium">✓ {generated} slot{generated !== 1 ? 's' : ''} created!</span>}
+            {generateError && <span className="text-sm text-red-500 font-medium">{generateError}</span>}
           </div>
         </form>
 
