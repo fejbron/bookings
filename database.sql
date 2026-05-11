@@ -7,6 +7,10 @@
 --   supabase-rls-fix.sql, backfill-user-ids.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- Required extensions ──────────────────────────────────────────────────────────
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- gen_random_uuid()
+
 -- Tables ───────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lecturer_profiles (
@@ -117,6 +121,15 @@ ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS user_id      uuid REFERENCES
 
 -- Drop legacy single-tenant unique constraints
 ALTER TABLE calendar_types DROP CONSTRAINT IF EXISTS calendar_types_name_key;
+
+-- Ensure id columns have a default on legacy tables (older migrations omitted it)
+ALTER TABLE lecturer_profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE calendar_types    ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE slots             ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE slot_configs      ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE bookings          ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE admin_settings    ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE team_members      ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 -- Indices ──────────────────────────────────────────────────────────────────────
 

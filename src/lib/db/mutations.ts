@@ -33,7 +33,7 @@ export async function upsertProfile(input: CreateProfileInput): Promise<Lecturer
       description: input.description?.trim() || null,
       account_type: input.accountType,
       is_public: true,
-    }, { onConflict: 'email' })
+    }, { onConflict: 'user_id' })
     .select('*').single()
   if (error) throw new DbError('upsertProfile', error)
   return toProfile(data)
