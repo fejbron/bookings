@@ -118,51 +118,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Track in-flight account loads so we ignore stale results
   const loadGen = useRef(0)
 
+  // Tracks whether the initial getSession() has resolved. We use this so the
+  // hydrate effect below doesn't prematurely flip authLoading=false on first
+  // render (before we even know if there's a saved session).
+  const [sessionChecked, setSessionChecked] = useState(false)
+
   // ── Auth bootstrap ─────────────────────────────────────────────────────────
-
-  const hydrate = useCallback(async (u: User | null) => {
-    if (!u) {
-      setProfile(null)
-      setTeamMembers([])
-      setManagedAccounts([])
-      setActiveUserId(null)
-      return
-    }
-
-    const [profileR, teamR, managedR] = await Promise.allSettled([
-      q.getProfileByUserId(u.id),
-      q.getTeam(u.id),
-      q.getManagedAccounts(u.email!, u.id),
-    ])
-
-    setProfile(profileR.status === 'fulfilled' ? profileR.value : null)
-    setTeamMembers(teamR.status === 'fulfilled' ? teamR.value : [])
-    setManagedAccounts(managedR.status === 'fulfilled' ? managedR.value : [])
-
-    // Default active account to own user
-    setActiveUserId((prev) => prev ?? u.id)
-  }, [])
+  // IMPORTANT: Supabase's onAuthStateChange callback must NOT await any DB
+  // queries — doing so deadlocks the auth lock and every subsequent supabase
+  // call hangs without firing a request. We only set `user` here, and a
+  // separate effect below reacts to the change and runs hydrate().
+  // Ref: https://supabase.com/docs/reference/javascript/auth-onauthstatechange
 
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
-      const u = session?.user ?? null
-      setUser(u)
-      await hydrate(u)
-      if (mounted) setAuthLoading(false)
+      setUser(session?.user ?? null)
+      setSessionChecked(true)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return
-      const u = session?.user ?? null
-      setUser(u)
-      await hydrate(u)
+      setUser(session?.user ?? null)
     })
 
     return () => { mounted = false; subscription.unsubscribe() }
-  }, [hydrate])
+  }, [])
+
+  // Hydrate profile/team/managed-accounts whenever the auth user changes.
+  // Runs *outside* the auth callback, so DB calls don't fight the auth lock.
+  useEffect(() => {
+    if (!sessionChecked) return
+    let cancelled = false
+
+    async function hydrate() {
+      if (!user) {
+        setProfile(null)
+        setTeamMembers([])
+        setManagedAccounts([])
+        setActiveUserId(null)
+        setAuthLoading(false)
+        return
+      }
+
+      const [profileR, teamR, managedR] = await Promise.allSettled([
+        q.getProfileByUserId(user.id),
+        q.getTeam(user.id),
+        q.getManagedAccounts(user.email!, user.id),
+      ])
+      if (cancelled) return
+
+      setProfile(profileR.status === 'fulfilled' ? profileR.value : null)
+      setTeamMembers(teamR.status === 'fulfilled' ? teamR.value : [])
+      setManagedAccounts(managedR.status === 'fulfilled' ? managedR.value : [])
+      setActiveUserId((prev) => prev ?? user.id)
+      setAuthLoading(false)
+    }
+
+    void hydrate()
+    return () => { cancelled = true }
+  }, [user, sessionChecked])
 
   // ── Account data loading ───────────────────────────────────────────────────
 

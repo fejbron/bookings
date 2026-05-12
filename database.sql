@@ -192,10 +192,30 @@ ALTER TABLE team_members          ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 -- Indices ──────────────────────────────────────────────────────────────────────
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_username   ON lecturer_profiles(username)     WHERE username IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_user_id    ON lecturer_profiles(user_id)      WHERE user_id  IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_username   ON professional_profiles(username) WHERE username IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_user_id    ON professional_profiles(user_id)  WHERE user_id  IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lp_username ON lecturer_profiles(username)     WHERE username IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pp_username ON professional_profiles(username) WHERE username IS NOT NULL;
+
+-- user_id needs a proper UNIQUE *constraint* (not a partial index) so that
+-- Supabase's upsert(..., { onConflict: 'user_id' }) — which sends
+-- `ON CONFLICT (user_id)` with no predicate — can resolve a target.
+-- A constraint on a nullable column still allows multiple NULLs, so legacy
+-- unclaimed profiles continue to work.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lecturer_profiles_user_id_key') THEN
+    ALTER TABLE lecturer_profiles
+      ADD CONSTRAINT lecturer_profiles_user_id_key UNIQUE (user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'professional_profiles_user_id_key') THEN
+    ALTER TABLE professional_profiles
+      ADD CONSTRAINT professional_profiles_user_id_key UNIQUE (user_id);
+  END IF;
+END $$;
+
+-- Older installs may have a partial unique index on the same column. Drop
+-- it: the constraint above creates its own (non-partial) unique index.
+DROP INDEX IF EXISTS idx_lp_user_id;
+DROP INDEX IF EXISTS idx_pp_user_id;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ct_name_user  ON calendar_types(name, user_id) WHERE user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_as_user_id    ON admin_settings(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX        IF NOT EXISTS idx_slots_user_date    ON slots(user_id, date);
