@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Search, Download, X, MessageSquare, CheckCircle, AlertCircle, GraduationCap, Save, Check } from 'lucide-react'
-import { useBookings, useSlots, useEventTypes } from '../../hooks'
+import { useBookings, useSlots, useEventTypes, useAccount } from '../../hooks'
 import { exportBookingsCSV } from '../../lib/csv'
 import { formatTime } from '../../components/TimeSlots'
 import { ErrorState } from '../../components/ui/States'
@@ -20,6 +20,8 @@ export default function DashboardBookings() {
   const { bookings, error, confirm, cancel, reschedule, setComment, setStudents } = useBookings()
   const { slots, getAvailableSlots } = useSlots()
   const { types: calendarTypeRecords } = useEventTypes()
+  const { activeProfile } = useAccount()
+  const isLecturer = activeProfile?.accountType === 'lecturer'
   const [filter, setFilter] = useState<TabFilter>('upcoming')
   const [search, setSearch] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
@@ -100,14 +102,6 @@ export default function DashboardBookings() {
     } finally {
       setRescheduleLoading(false)
     }
-  }
-
-  function isCompleted(b: Booking) {
-    try {
-      const dt = parseISO(`${b.date}T${b.time}`)
-      dt.setMinutes(dt.getMinutes() + b.duration)
-      return dt < new Date()
-    } catch { return false }
   }
 
   async function handleSaveScores() {
@@ -322,57 +316,60 @@ export default function DashboardBookings() {
                   </div>
                 )}
 
-                {/* Student roster + scores */}
-                {selectedBooking.students && selectedBooking.students.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-[var(--border)]">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1">
-                        <GraduationCap style={{ width: 11, height: 11 }} /> Students
-                      </p>
-                      {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' && (
-                        <span className="text-[10px] text-blue-500 font-semibold">Enter scores</span>
+                {/* Student roster + scores (lecturer accounts only) */}
+                {isLecturer && selectedBooking.students && selectedBooking.students.length > 0 && (() => {
+                  const canScore = selectedBooking.status === 'confirmed'
+                  return (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1">
+                          <GraduationCap style={{ width: 11, height: 11 }} /> Students
+                        </p>
+                        {canScore && (
+                          <span className="text-[10px] text-blue-500 font-semibold">Enter scores</span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {scoreDraft.map((s, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{s.name}</p>
+                              <p className="text-[10px] text-[var(--text-muted)]">{s.indexNumber}</p>
+                            </div>
+                            {canScore ? (
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={s.score ?? ''}
+                                onChange={e => {
+                                  const val = e.target.value === '' ? null : Number(e.target.value)
+                                  setScoreDraft(prev => prev.map((st, idx) => idx === i ? { ...st, score: val } : st))
+                                  setScoresSaved(false)
+                                }}
+                                placeholder="—"
+                                className="w-16 px-2 py-1 rounded-lg border border-[var(--border)] text-xs text-center text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white"
+                              />
+                            ) : (
+                              <span className="text-xs font-semibold text-[var(--text-primary)] w-16 text-right">
+                                {s.score != null ? s.score : '—'}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {canScore && (
+                        <button
+                          onClick={handleSaveScores}
+                          disabled={scoresLoading}
+                          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40"
+                        >
+                          {scoresLoading ? 'Saving…' : scoresSaved ? <><Check style={{ width: 12, height: 12 }} /> Saved</> : <><Save style={{ width: 12, height: 12 }} /> Save scores</>}
+                        </button>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      {scoreDraft.map((s, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-[var(--text-primary)] truncate">{s.name}</p>
-                            <p className="text-[10px] text-[var(--text-muted)]">{s.indexNumber}</p>
-                          </div>
-                          {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' ? (
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={s.score ?? ''}
-                              onChange={e => {
-                                const val = e.target.value === '' ? null : Number(e.target.value)
-                                setScoreDraft(prev => prev.map((st, idx) => idx === i ? { ...st, score: val } : st))
-                                setScoresSaved(false)
-                              }}
-                              placeholder="—"
-                              className="w-16 px-2 py-1 rounded-lg border border-[var(--border)] text-xs text-center text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-white"
-                            />
-                          ) : (
-                            <span className="text-xs font-semibold text-[var(--text-primary)] w-16 text-right">
-                              {s.score != null ? s.score : '—'}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {isCompleted(selectedBooking) && selectedBooking.status === 'confirmed' && (
-                      <button
-                        onClick={handleSaveScores}
-                        disabled={scoresLoading}
-                        className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40"
-                      >
-                        {scoresLoading ? 'Saving…' : scoresSaved ? <><Check style={{ width: 12, height: 12 }} /> Saved</> : <><Save style={{ width: 12, height: 12 }} /> Save scores</>}
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* Comment */}
                 <div className="mt-4 pt-4 border-t border-[var(--border)]">
