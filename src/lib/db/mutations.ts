@@ -98,16 +98,17 @@ const PROFESSIONAL_COL: Record<string, string> = {
 }
 
 function buildPatch(input: UpdateProfileInput, typeCol: Record<string, string>): Record<string, unknown> {
+  const src = input as unknown as Record<string, unknown>
   const patch: Record<string, unknown> = {}
   for (const [key, col] of Object.entries(COMMON_COL)) {
-    const value = (input as Record<string, unknown>)[key]
+    const value = src[key]
     if (value !== undefined) {
       const norm = COMMON_PATCH[key] ?? ((v: unknown) => v)
       patch[col] = norm(value)
     }
   }
   for (const [key, col] of Object.entries(typeCol)) {
-    const value = (input as Record<string, unknown>)[key]
+    const value = src[key]
     if (value !== undefined) {
       if (typeof value === 'string') patch[col] = value.trim() || null
       else patch[col] = value
