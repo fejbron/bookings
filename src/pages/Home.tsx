@@ -68,14 +68,10 @@ export default function Home() {
           }}
         />
         <div className="relative max-w-5xl mx-auto px-6 pt-16 pb-14 text-center">
-          {/* <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
-            <Sparkles style={{ width: 12, height: 12 }} />
-            Book in three steps
-          </span> */}
           <h1 className="mt-5 text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
             Book a Session,
-            {/* <br className="hidden sm:block" />
-            <span className="text-gray-500"> in seconds.</span> */}
+            <br className="hidden sm:block" />
+            <span className="text-gray-500"> in seconds.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-gray-500 max-w-xl mx-auto">
             Open the link shared with you, pick a time on their calendar,
