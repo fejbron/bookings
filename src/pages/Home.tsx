@@ -69,7 +69,7 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto px-6 pt-16 pb-14 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
             Book a Session,
-            <br className="hidden sm:block" />
+            {/* <br className="hidden sm:block" /> */}
             <span className="text-gray-500"> in seconds.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-gray-500 max-w-xl mx-auto">
