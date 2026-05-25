@@ -187,22 +187,6 @@ export default function Home() {
 
       {/* Directory */}
       <section id="directory" className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-              Step 1 · Find someone
-            </p>
-            <h2 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-              Browse professionals
-            </h2>
-          </div>
-          {!loading && !error && filtered.length > 0 && (
-            <p className="text-xs text-gray-400 hidden sm:block">
-              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-
         {error ? (
           <ErrorState error={error} retry={() => window.location.reload()} />
         ) : loading ? (
