@@ -6,7 +6,6 @@ import {
   CalendarCheck,
   CheckCircle2,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react'
 
 const STEPS = [
@@ -68,7 +67,7 @@ export default function Home() {
           }}
         />
         <div className="relative max-w-5xl mx-auto px-6 pt-16 pb-14 text-center">
-          <h1 className="mt-5 text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
             Book a Session,
             <br className="hidden sm:block" />
             <span className="text-gray-500"> in seconds.</span>
