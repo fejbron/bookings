@@ -12,7 +12,7 @@ import {
 const STEPS = [
   {
     icon: UserSearch,
-    title: 'Find a professional',
+    title: 'Connect',
     body: 'Open the booking link they shared with you (it looks like bookslot.app/their-handle).',
   },
   {
@@ -73,12 +73,12 @@ export default function Home() {
             Book in three steps
           </span>
           <h1 className="mt-5 text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">
-            Book time with professionals,
+            Book a Session,
             <br className="hidden sm:block" />
             <span className="text-gray-500"> in seconds.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-gray-500 max-w-xl mx-auto">
-            Open the link your professional shared, pick a time on their calendar,
+            Open the link shared with you, pick a time on their calendar,
             and get an instant confirmation. No emails. No back-and-forth.
           </p>
 
@@ -110,7 +110,7 @@ export default function Home() {
               Three steps to your next meeting
             </h2>
             <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
-              BookSlot keeps things simple — for you and the professional you're meeting.
+              BookSlot keeps things simple.
             </p>
           </div>
           <ol className="grid grid-cols-1 md:grid-cols-3 gap-4">
