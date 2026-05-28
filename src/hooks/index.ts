@@ -9,6 +9,7 @@ export function useAuth() {
     profile: a.profile,
     loading: a.authLoading,
     needsSetup: a.needsSetup,
+    isPlatformAdmin: a.isPlatformAdmin,
     signIn: a.signIn,
     signUp: a.signUp,
     signOut: a.signOut,

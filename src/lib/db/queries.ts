@@ -56,8 +56,8 @@ export async function getProfileByUserId(userId: string): Promise<Profile | null
 
 export async function getProfileByUsername(username: string): Promise<Profile | null> {
   const [lecRes, proRes] = await Promise.all([
-    supabase.from('lecturer_profiles').select('*').eq('username', username).eq('is_public', true).maybeSingle(),
-    supabase.from('professional_profiles').select('*').eq('username', username).eq('is_public', true).maybeSingle(),
+    supabase.from('lecturer_profiles').select('*').eq('username', username).eq('is_public', true).is('suspended_at', null).maybeSingle(),
+    supabase.from('professional_profiles').select('*').eq('username', username).eq('is_public', true).is('suspended_at', null).maybeSingle(),
   ])
   if (lecRes.error) throw new DbError('getProfileByUsername.lecturer', lecRes.error)
   if (proRes.error) throw new DbError('getProfileByUsername.professional', proRes.error)
@@ -69,9 +69,9 @@ export async function getProfileByUsername(username: string): Promise<Profile | 
 export async function getPublicProfiles(): Promise<Profile[]> {
   const [lecRes, proRes] = await Promise.all([
     supabase.from('lecturer_profiles').select('*')
-      .eq('is_public', true).not('username', 'is', null).order('name'),
+      .eq('is_public', true).is('suspended_at', null).not('username', 'is', null).order('name'),
     supabase.from('professional_profiles').select('*')
-      .eq('is_public', true).not('username', 'is', null).order('name'),
+      .eq('is_public', true).is('suspended_at', null).not('username', 'is', null).order('name'),
   ])
   if (lecRes.error) throw new DbError('getPublicProfiles.lecturer', lecRes.error)
   if (proRes.error) throw new DbError('getPublicProfiles.professional', proRes.error)
@@ -208,6 +208,20 @@ export async function isSlotTaken(slotId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('bookings').select('id').eq('slot_id', slotId).in('status', ['confirmed', 'pending']).maybeSingle()
   if (error) throw new DbError('isSlotTaken', error)
+  return !!data
+}
+
+// Platform admin lookup ───────────────────────────────────────────────────────
+
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('platform_admins').select('user_id').eq('user_id', userId).maybeSingle()
+  if (error) {
+    // Don't throw — surface as "not admin" so a missing table on a legacy
+    // install doesn't break the app shell.
+    console.warn('[isPlatformAdmin]', error.message)
+    return false
+  }
   return !!data
 }
 

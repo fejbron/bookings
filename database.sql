@@ -471,3 +471,246 @@ BEGIN
 
   RETURN QUERY SELECT s, c, t, a, b;
 END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Platform Superadmin
+--
+-- A small set of users that can manage everything across the platform.
+-- Identity lives in `platform_admins`; `is_platform_admin()` is consulted by
+-- every RLS policy so admins can transparently read/write any row.
+--
+-- Bootstrapping the first superadmin (do this once after the user has signed
+-- up via the normal flow):
+--   INSERT INTO platform_admins (user_id)
+--   SELECT id FROM auth.users WHERE email = 'you@example.com';
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS platform_admins (
+  user_id    uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role       text NOT NULL DEFAULT 'superadmin',
+  granted_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  granted_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Single-row platform configuration. Enforced by a CHECK on id=1.
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id                  int  PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  signups_enabled     boolean NOT NULL DEFAULT true,
+  banner_message      text NOT NULL DEFAULT '',
+  maintenance_message text NOT NULL DEFAULT '',
+  updated_at          timestamptz NOT NULL DEFAULT now(),
+  updated_by          uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+INSERT INTO platform_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS platform_audit_log (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_user_id  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  action         text NOT NULL,
+  target_type    text,
+  target_id      text,
+  metadata       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pal_created_at ON platform_audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pal_actor      ON platform_audit_log(actor_user_id);
+CREATE INDEX IF NOT EXISTS idx_pal_action     ON platform_audit_log(action);
+
+-- Soft-suspend signal on profiles. When non-null, profile is hidden from the
+-- public directory and the booking page.
+ALTER TABLE lecturer_profiles     ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+
+-- is_platform_admin(): runs SECURITY DEFINER so RLS policies can call it
+-- without recursing into platform_admins' own RLS.
+CREATE OR REPLACE FUNCTION is_platform_admin(uid uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (SELECT 1 FROM platform_admins WHERE user_id = uid)
+$$;
+
+-- ── Extend existing RLS so admins bypass owner checks ──────────────────────
+
+-- Profiles
+DROP POLICY IF EXISTS "lp_read"   ON lecturer_profiles;
+DROP POLICY IF EXISTS "lp_update" ON lecturer_profiles;
+DROP POLICY IF EXISTS "lp_delete" ON lecturer_profiles;
+CREATE POLICY "lp_read" ON lecturer_profiles FOR SELECT USING (
+  is_platform_admin()
+  OR is_public
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members
+    WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "lp_update" ON lecturer_profiles FOR UPDATE USING (
+  is_platform_admin() OR auth.uid() = user_id OR user_id IS NULL
+);
+CREATE POLICY "lp_delete" ON lecturer_profiles FOR DELETE USING (
+  is_platform_admin() OR auth.uid() = user_id
+);
+
+DROP POLICY IF EXISTS "pp_read"   ON professional_profiles;
+DROP POLICY IF EXISTS "pp_update" ON professional_profiles;
+DROP POLICY IF EXISTS "pp_delete" ON professional_profiles;
+CREATE POLICY "pp_read" ON professional_profiles FOR SELECT USING (
+  is_platform_admin()
+  OR is_public
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members
+    WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "pp_update" ON professional_profiles FOR UPDATE USING (
+  is_platform_admin() OR auth.uid() = user_id OR user_id IS NULL
+);
+CREATE POLICY "pp_delete" ON professional_profiles FOR DELETE USING (
+  is_platform_admin() OR auth.uid() = user_id
+);
+
+-- Slots
+DROP POLICY IF EXISTS "slots_update" ON slots;
+DROP POLICY IF EXISTS "slots_delete" ON slots;
+CREATE POLICY "slots_update" ON slots FOR UPDATE USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "slots_delete" ON slots FOR DELETE USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+
+-- Calendar types
+DROP POLICY IF EXISTS "ct_update" ON calendar_types;
+DROP POLICY IF EXISTS "ct_delete" ON calendar_types;
+CREATE POLICY "ct_update" ON calendar_types FOR UPDATE USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "ct_delete" ON calendar_types FOR DELETE USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+
+-- Slot configs
+DROP POLICY IF EXISTS "sc_read"   ON slot_configs;
+DROP POLICY IF EXISTS "sc_delete" ON slot_configs;
+CREATE POLICY "sc_read"   ON slot_configs FOR SELECT USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+CREATE POLICY "sc_delete" ON slot_configs FOR DELETE USING (
+  is_platform_admin()
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+
+-- Bookings (read/insert/update are already wide-open; add a delete policy)
+DROP POLICY IF EXISTS "bk_delete" ON bookings;
+CREATE POLICY "bk_delete" ON bookings FOR DELETE USING (is_platform_admin());
+
+-- Admin settings (per-user, not platform)
+DROP POLICY IF EXISTS "as_read" ON admin_settings;
+CREATE POLICY "as_read" ON admin_settings FOR SELECT USING (
+  is_platform_admin()
+  OR user_id IS NULL
+  OR auth.uid() = user_id
+  OR user_id IN (
+    SELECT host_user_id FROM team_members WHERE member_email = auth.jwt()->>'email' AND status = 'active'
+  )
+);
+
+-- Team members
+DROP POLICY IF EXISTS "tm_host_select"   ON team_members;
+DROP POLICY IF EXISTS "tm_host_delete"   ON team_members;
+CREATE POLICY "tm_host_select" ON team_members FOR SELECT USING (
+  is_platform_admin() OR auth.uid() = host_user_id
+);
+CREATE POLICY "tm_host_delete" ON team_members FOR DELETE USING (
+  is_platform_admin() OR auth.uid() = host_user_id
+);
+
+-- ── RLS on new platform tables ─────────────────────────────────────────────
+
+ALTER TABLE platform_admins    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_audit_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "pa_read"   ON platform_admins;
+DROP POLICY IF EXISTS "pa_insert" ON platform_admins;
+DROP POLICY IF EXISTS "pa_delete" ON platform_admins;
+CREATE POLICY "pa_read"   ON platform_admins FOR SELECT USING (
+  is_platform_admin() OR auth.uid() = user_id
+);
+CREATE POLICY "pa_insert" ON platform_admins FOR INSERT WITH CHECK (is_platform_admin());
+CREATE POLICY "pa_delete" ON platform_admins FOR DELETE USING (is_platform_admin());
+
+DROP POLICY IF EXISTS "ps_read"   ON platform_settings;
+DROP POLICY IF EXISTS "ps_update" ON platform_settings;
+CREATE POLICY "ps_read"   ON platform_settings FOR SELECT USING (true);
+CREATE POLICY "ps_update" ON platform_settings FOR UPDATE USING (is_platform_admin());
+
+DROP POLICY IF EXISTS "pal_read"   ON platform_audit_log;
+DROP POLICY IF EXISTS "pal_insert" ON platform_audit_log;
+CREATE POLICY "pal_read"   ON platform_audit_log FOR SELECT USING (is_platform_admin());
+CREATE POLICY "pal_insert" ON platform_audit_log FOR INSERT WITH CHECK (
+  is_platform_admin() AND actor_user_id = auth.uid()
+);
+
+-- ── Platform metrics helper (single round-trip count aggregation) ─────────
+
+CREATE OR REPLACE FUNCTION get_platform_metrics()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'total_users',           (SELECT count(*) FROM (
+                               SELECT user_id FROM lecturer_profiles WHERE user_id IS NOT NULL
+                               UNION
+                               SELECT user_id FROM professional_profiles WHERE user_id IS NOT NULL
+                             ) u),
+    'lecturers',             (SELECT count(*) FROM lecturer_profiles     WHERE user_id IS NOT NULL),
+    'professionals',         (SELECT count(*) FROM professional_profiles WHERE user_id IS NOT NULL),
+    'suspended_users',       (SELECT count(*) FROM (
+                               SELECT user_id FROM lecturer_profiles     WHERE suspended_at IS NOT NULL
+                               UNION
+                               SELECT user_id FROM professional_profiles WHERE suspended_at IS NOT NULL
+                             ) s),
+    'total_bookings',        (SELECT count(*) FROM bookings),
+    'bookings_last_7_days',  (SELECT count(*) FROM bookings WHERE created_at >= now() - interval '7 days'),
+    'bookings_pending',      (SELECT count(*) FROM bookings WHERE status = 'pending'),
+    'bookings_confirmed',    (SELECT count(*) FROM bookings WHERE status = 'confirmed'),
+    'total_slots',           (SELECT count(*) FROM slots),
+    'slots_upcoming',        (SELECT count(*) FROM slots WHERE date >= current_date),
+    'total_teams',           (SELECT count(*) FROM team_members),
+    'total_session_types',   (SELECT count(*) FROM calendar_types),
+    'platform_admins',       (SELECT count(*) FROM platform_admins)
+  )
+$$;

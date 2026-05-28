@@ -9,6 +9,7 @@ interface BaseProfile {
   title?: string
   description?: string
   isPublic: boolean
+  suspendedAt?: string
   createdAt: string
 }
 

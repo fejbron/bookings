@@ -17,6 +17,7 @@ export interface LecturerProfileRow {
   office_hours: string | null
   courses: string[] | null
   academic_rank: string | null
+  suspended_at: string | null
   created_at: string
 }
 
@@ -36,6 +37,7 @@ export interface ProfessionalProfileRow {
   location: string | null
   website: string | null
   linkedin_url: string | null
+  suspended_at: string | null
   created_at: string
 }
 
@@ -107,5 +109,33 @@ export interface TeamMemberRow {
   member_user_id: string | null
   role: string
   status: 'active' | 'pending'
+  created_at: string
+}
+
+// ── Platform admin tables ──────────────────────────────────────────────────
+
+export interface PlatformAdminRow {
+  user_id: string
+  role: string
+  granted_by: string | null
+  granted_at: string
+}
+
+export interface PlatformSettingsRow {
+  id: number
+  signups_enabled: boolean
+  banner_message: string
+  maintenance_message: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export interface PlatformAuditLogRow {
+  id: string
+  actor_user_id: string | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  metadata: unknown
   created_at: string
 }

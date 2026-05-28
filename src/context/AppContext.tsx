@@ -33,6 +33,7 @@ interface AppContextValue {
   authLoading: boolean
   profile: Profile | null
   needsSetup: boolean
+  isPlatformAdmin: boolean
 
   // Active account (own or managed)
   activeUserId: string | null
@@ -109,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [activeUserId, setActiveUserId] = useState<string | null>(null)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
 
   // Account data state
   const [account, setAccount] = useState<AccountState>(EMPTY_ACCOUNT)
@@ -159,14 +161,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTeamMembers([])
         setManagedAccounts([])
         setActiveUserId(null)
+        setIsPlatformAdmin(false)
         setAuthLoading(false)
         return
       }
 
-      const [profileR, teamR, managedR] = await Promise.allSettled([
+      const [profileR, teamR, managedR, adminR] = await Promise.allSettled([
         q.getProfileByUserId(user.id),
         q.getTeam(user.id),
         q.getManagedAccounts(user.email!, user.id),
+        q.isPlatformAdmin(user.id),
       ])
       if (cancelled) return
 
@@ -174,6 +178,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTeamMembers(teamR.status === 'fulfilled' ? teamR.value : [])
       setManagedAccounts(managedR.status === 'fulfilled' ? managedR.value : [])
       setActiveUserId((prev) => prev ?? user.id)
+
+      let admin = adminR.status === 'fulfilled' ? adminR.value : false
+
+      // If not yet admin, try env-var allowlist promotion via the
+      // bootstrap-admin Edge Function. The function is idempotent and silently
+      // refuses callers who aren't on the allowlist, so it's safe to call on
+      // every login.
+      if (!admin && user.email) {
+        try {
+          const { data, error } = await supabase.functions.invoke('bootstrap-admin', { body: {} })
+          if (!error && data && typeof data === 'object' && (data as { promoted?: boolean }).promoted) {
+            admin = true
+          }
+        } catch {
+          // function not deployed or unreachable — fine, falls through to false
+        }
+      }
+      if (cancelled) return
+
+      setIsPlatformAdmin(admin)
       setAuthLoading(false)
     }
 
@@ -415,7 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const needsSetup = !!user && !authLoading && !profile
 
   const value: AppContextValue = {
-    user, authLoading, profile, needsSetup,
+    user, authLoading, profile, needsSetup, isPlatformAdmin,
     activeUserId, activeProfile, isManagingOther, managedAccounts, teamMembers,
     account, dataLoading, dataError,
     signIn, signUp, signOut, changePassword, createProfile, updateProfile,

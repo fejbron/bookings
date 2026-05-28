@@ -28,6 +28,7 @@ export function toLecturerProfile(r: LecturerProfileRow): LecturerProfile {
     officeHours: r.office_hours ?? undefined,
     courses: r.courses ?? [],
     academicRank: r.academic_rank ?? undefined,
+    suspendedAt: r.suspended_at ?? undefined,
     createdAt: r.created_at,
   }
 }
@@ -50,6 +51,7 @@ export function toProfessionalProfile(r: ProfessionalProfileRow): ProfessionalPr
     location: r.location ?? undefined,
     website: r.website ?? undefined,
     linkedinUrl: r.linkedin_url ?? undefined,
+    suspendedAt: r.suspended_at ?? undefined,
     createdAt: r.created_at,
   }
 }

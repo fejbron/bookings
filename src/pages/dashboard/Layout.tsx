@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   CalendarDays, LayoutGrid, Clock, Settings, LogOut,
-  Menu, X, ExternalLink, Copy, Check, BookOpen, ChevronDown, Users,
+  Menu, X, ExternalLink, Copy, Check, BookOpen, ChevronDown, Users, Shield,
 } from 'lucide-react'
 import { useAuth, useAccount, useBookings } from '../../hooks'
 import { format } from 'date-fns'
@@ -98,7 +98,7 @@ function AccountSwitcher() {
 }
 
 export default function DashboardLayout() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isPlatformAdmin } = useAuth()
   const { activeProfile, isManagingOther } = useAccount()
   const { bookings } = useBookings()
   const { pathname } = useLocation()
@@ -179,6 +179,17 @@ export default function DashboardLayout() {
             )}
           </Link>
         ))}
+        {isPlatformAdmin && (
+          <Link
+            to="/admin"
+            onClick={() => setMobileOpen(false)}
+            className={`nav-item mt-3 ${pathname.startsWith('/admin') ? 'active' : ''}`}
+          >
+            <Shield style={{ width: 16, height: 16 }} />
+            <span className="flex-1">Admin</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-500">Platform</span>
+          </Link>
+        )}
       </nav>
 
       {/* User */}
