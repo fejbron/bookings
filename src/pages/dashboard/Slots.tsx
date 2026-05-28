@@ -21,7 +21,9 @@ export default function DashboardSlots() {
   const [endDate, setEndDate] = useState('')
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
+  const DURATION_PRESETS = [5, 10, 15, 20, 30, 45, 60]
   const [duration, setDuration] = useState(15)
+  const [customDuration, setCustomDuration] = useState(false)
   const [breakBetween, setBreakBetween] = useState(0)
   const [excludeWeekends, setExcludeWeekends] = useState(true)
   const [classGroup, setClassGroup] = useState('')
@@ -238,9 +240,46 @@ export default function DashboardSlots() {
           <div className="grid sm:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Duration</label>
-              <select value={duration} onChange={e => setDuration(Number(e.target.value))} className={fieldCls}>
-                {[5, 10, 15, 20, 30, 45, 60].map(v => <option key={v} value={v}>{v} minutes</option>)}
-              </select>
+              {customDuration ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={480}
+                    value={duration}
+                    onChange={e => {
+                      const v = Number(e.target.value)
+                      if (Number.isFinite(v)) setDuration(Math.max(1, Math.min(480, v)))
+                    }}
+                    placeholder="e.g. 25"
+                    autoFocus
+                    className={`${fieldCls} flex-1`}
+                  />
+                  <span className="text-xs text-[var(--text-muted)] shrink-0">min</span>
+                  <button
+                    type="button"
+                    onClick={() => { setCustomDuration(false); setDuration(15) }}
+                    className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] underline shrink-0"
+                  >
+                    Presets
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={DURATION_PRESETS.includes(duration) ? String(duration) : 'custom'}
+                  onChange={e => {
+                    if (e.target.value === 'custom') {
+                      setCustomDuration(true)
+                    } else {
+                      setDuration(Number(e.target.value))
+                    }
+                  }}
+                  className={fieldCls}
+                >
+                  {DURATION_PRESETS.map(v => <option key={v} value={v}>{v} minutes</option>)}
+                  <option value="custom">Custom…</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Break between</label>
